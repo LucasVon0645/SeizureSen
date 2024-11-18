@@ -1,6 +1,9 @@
 # Ignore data and models
-data/
-models/
+data/*
+models/*
+
+!.gitkeep
+
 *.h5
 *.pt
 
