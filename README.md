@@ -1,9 +1,6 @@
 # SeizureSen
 
-# SeizureSen
-
 **SeizureSen** is a project developed at **Technische Universität Darmstadt** in the seminar **Data Science II** during the **Winter Semester 24/25**. Its goal is to present an application which allows the prediction of seizures in dogs using intracranial EEG (iEEG) signals. The application utilizes machine learning to classify the preictal phase of brain activity, leveraging the dataset from the [American Epilepsy Society Seizure Prediction Challenge](https://www.kaggle.com/competitions/seizure-prediction/overview).
-
 
 ## Dataset
 
