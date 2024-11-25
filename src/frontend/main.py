@@ -23,7 +23,7 @@ def main():
     
     dog_image_path = 'image.png'
 
-    # Customizing the style to match the blue and black theme
+    # Customizing the style to match the blue and black theme.
     image_style = """
     <style>
         .dog-image {
@@ -39,13 +39,13 @@ def main():
         }
     </style>
 """
-    # Inserting the image with the custom styling
+    # Inserting the image with the custom styling.
     st.markdown(image_style, unsafe_allow_html=True)
 
     # Heading and left-aligned image
-    col1, col2 = st.columns([.2, 2])  # Creating two columns, one for the heading, the other for the image
+    col1, col2 = st.columns([.2, 2])  # Creating two columns, one for the heading, the other for the image.
 
-    # Adding heading in the second column
+    # Adding heading in the second column.
     col2.markdown(
     """
     <h1 style='
@@ -65,13 +65,13 @@ def main():
         dog_image = Image.open(dog_image_path)
         col1.image(dog_image, width=110)  
     except Exception as e:
-        # We can comment this as the image is for optional(aesthatic reasons).
+        # We can comment this as the image is  optional(for aesthetic reasons).
         st.error(f"Error loading the image: {e}")
         st.title("EEG Signal Viewer and Preictal Detection")
 
     
     
-    # Uploading the file
+    # Uploading the file.
     st.sidebar.header("Upload EEG File")
     #Specifying the type of file.
     uploaded_file = st.sidebar.file_uploader("Choose a file", type=["mat"])
@@ -90,13 +90,13 @@ def main():
             if interictal_segment_key is None:
                 st.error("No interictal data not found in the .mat file!")
             else:
-                # Extracting the data
+                # Extracting the data.
                 interictal_segment = mat_data[interictal_segment_key]
                 segment = interictal_segment[0, 0]
                 eeg_data = segment['data']
                 st.success(f"EEG Signal Loaded Successfully from {interictal_segment_key}!")
 
-                # Setting up chunk processing parameters
+                # Setting up chunk processing parameters.
                 chunk_size = st.sidebar.slider("Chunk size (number of samples)", 10, 1000, 500)
                 sleep_time = st.sidebar.slider("Time interval per chunk (in seconds)", 0.1, 2.0, 0.5)
 
@@ -109,9 +109,9 @@ def main():
                     with placeholder.container():
                         fig = go.Figure()
                         fig.add_trace(go.Scatter(
-                        y=chunk,  # The EEG chunk data
-                        mode='lines',  # Line plot
-                        name="Current Chunk"  # Legend label
+                        y=chunk, 
+                        mode='lines',  
+                        name="Current Chunk"  
                         ))
                     
                         fig.update_layout(
