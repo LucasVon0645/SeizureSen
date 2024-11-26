@@ -2,8 +2,6 @@
 data/*
 models/*
 
-!data/Dog_1_interictal_segment_0001.mat
-!data/data_extraction.py
 
 !.gitkeep
 
