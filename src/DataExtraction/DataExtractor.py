@@ -8,6 +8,7 @@ class DataExtractor:
     """
     This DataExtractor class will load and manage EEG segments
     """
+
     def __init__(self, data_directory):
         """
         Initialize the DataExtractor class with root directory
@@ -15,16 +16,11 @@ class DataExtractor:
         """
 
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        self.data_directory = os.path.normpath(os.path.join(script_dir, '..', '..', data_directory))
-        self.data = {
-            "interictal": [],
-            "preictal": [],
-            "test": []
-        }
-        self.metadata = {
-            "sampling_frequency": None,
-            "channels": None
-        }
+        self.data_directory = os.path.normpath(
+            os.path.join(script_dir, "..", "..", data_directory)
+        )
+        self.data = {"interictal": [], "preictal": [], "test": []}
+        self.metadata = {"sampling_frequency": None, "channels": None}
 
     def _load_segment(self, file_path):
         """
@@ -34,14 +30,14 @@ class DataExtractor:
         """
         mat_data = scipy.io.loadmat(file_path)
         key = next(key for key in mat_data.keys() if "segment" in key)
-        segment = mat_data[key][0,0]
+        segment = mat_data[key][0, 0]
 
-        #Extracting data and metadata from the wrapped nested structure
+        # Extracting data and metadata from the wrapped nested structure
 
-        eeg_data = segment['data']
-        data_length = segment['data_length_sec'][0,0]
-        sampling_frequency = segment['sampling_frequency'][0,0]
-        channels = segment['channels']
+        eeg_data = segment["data"]
+        data_length = segment["data_length_sec"][0, 0]
+        sampling_frequency = segment["sampling_frequency"][0, 0]
+        channels = segment["channels"]
         channels = channels.flatten().tolist()
 
         return {
@@ -59,7 +55,7 @@ class DataExtractor:
                             None to load all segments
         """
         if segment_types is None:
-            segment_types = ['interictal', 'preictal', 'test']
+            segment_types = ["interictal", "preictal", "test"]
 
         for dog_id in dog_ids:
             dog_path = os.path.join(self.data_directory, dog_id)
@@ -69,7 +65,7 @@ class DataExtractor:
             for file_name in os.listdir(dog_path):
                 file_path = os.path.join(dog_path, file_name)
 
-                #Find out which type of segment it is
+                # Find out which type of segment it is
                 segment_type = None
                 if "interictal" in file_name and "interictal" in segment_types:
                     segment_type = "interictal"
@@ -84,19 +80,23 @@ class DataExtractor:
                 if segment_type is None:
                     continue
 
-                #Loading segment
+                # Loading segment
                 segment_data = self._load_segment(file_path)
                 segment_data["label"] = label
 
                 if self.metadata["sampling_frequency"] is None:
-                    self.metadata["sampling_frequency"] = segment_data["sampling_frequency"]
+                    self.metadata["sampling_frequency"] = segment_data[
+                        "sampling_frequency"
+                    ]
                     self.metadata["channels"] = segment_data["channels"]
 
                 self.data[segment_type].append(segment_data)
 
         print(f"Loaded data for {len(dog_ids)} dog(s)")
         for segment_type in segment_types:
-            print(f"  - {segment_type.capitalize()} segments: {len(self.data[segment_type])}")
+            print(
+                f"  - {segment_type.capitalize()} segments: {len(self.data[segment_type])}"
+            )
 
     def get_data(self):
         """
@@ -112,7 +112,44 @@ class DataExtractor:
         """
         return self.metadata
 
-#USAGE
+def extract_segment_from_specific_file(file):
+    """
+    Load a single .mat file, extract its EEG and metadata.
+    :param file_path: Path to .mat file
+    :return: A dictionary containing EEG data and associated metadata.
+    """
+    mat_data = scipy.io.loadmat(file)
+    key = next(key for key in mat_data.keys() if "segment" in key)
+    segment = mat_data[key][0, 0]
+
+    if "interictal" in file.name:
+        segment_type = "interictal"
+    elif "preictal" in file.name:
+        segment_type = "preictal"
+    else:
+        segment_type = "test"
+
+    # Extracting data and metadata from the wrapped nested structure
+
+    eeg_data = segment["data"]
+    data_length = int(segment["data_length_sec"][0, 0])
+    sampling_frequency = float(segment["sampling_frequency"][0, 0])
+    channels = segment["channels"]
+    channels = channels.flatten().tolist()
+    
+    channels = [str(channel[0])[-4:] for channel in channels]
+
+    return {
+        "eeg_data": eeg_data,
+        "metadata": {
+            "type": segment_type,
+            "data_length": f"{data_length} seconds",
+            "sampling_frequency": "{:.2f}".format(sampling_frequency) + " Hz",
+            "channels": channels
+            }
+    }
+
+# USAGE
 
 """
 

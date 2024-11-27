@@ -5,6 +5,11 @@ import matplotlib.pyplot as plt
 from PIL import Image 
 import plotly.graph_objects as go
 import scipy.io
+import os
+
+import src.DataExtraction.DataExtractor as data_extractor
+
+from src.FrontEnd.utils.utils import display_metadata_in_expander
 
 
 def simulate_streaming(data, chunk_size, sleep_time):
@@ -21,7 +26,9 @@ def simulate_streaming(data, chunk_size, sleep_time):
 def main():
     st.set_page_config(page_title="EEG Seizure Prediction", page_icon=":dog:", layout="wide")
     
-    dog_image_path = 'image.png'
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    dog_image_path = os.path.join(script_dir, 'images/logo.png')
 
     # Customizing the style to match the blue and black theme.
     image_style = """
@@ -69,8 +76,6 @@ def main():
         st.error(f"Error loading the image: {e}")
         st.title("EEG Signal Viewer and Preictal Detection")
 
-    
-    
     # Uploading the file.
     st.sidebar.header("Upload EEG File")
     #Specifying the type of file.
@@ -79,28 +84,19 @@ def main():
     if uploaded_file:
         st.sidebar.success("File uploaded successfully!")
         try:
-            mat_data = scipy.io.loadmat(uploaded_file)
-            # Dynamically searching for the 'interictal_segment_*' key.
-            interictal_segment_key = None
-            for key in mat_data.keys():
-                if key.startswith('interictal_segment_'):
-                    interictal_segment_key = key
-                    break
+            data = data_extractor.extract_segment_from_specific_file(uploaded_file)
+            eeg_data = data["eeg_data"]
+            metadata = data["metadata"]
+            
+            st.success("EEG Signal Loaded Successfully!")
+            
+            display_metadata_in_expander(metadata)
 
-            if interictal_segment_key is None:
-                st.error("No interictal data not found in the .mat file!")
-            else:
-                # Extracting the data.
-                interictal_segment = mat_data[interictal_segment_key]
-                segment = interictal_segment[0, 0]
-                eeg_data = segment['data']
-                st.success(f"EEG Signal Loaded Successfully from {interictal_segment_key}!")
+            # Setting up chunk processing parameters.
+            chunk_size = st.sidebar.slider("Chunk size (number of samples)", 10, 1000, 500)
+            sleep_time = st.sidebar.slider("Time interval per chunk (in seconds)", 0.1, 2.0, 0.5)
 
-                # Setting up chunk processing parameters.
-                chunk_size = st.sidebar.slider("Chunk size (number of samples)", 10, 1000, 500)
-                sleep_time = st.sidebar.slider("Time interval per chunk (in seconds)", 0.1, 2.0, 0.5)
-
-                placeholder = st.empty()
+            placeholder = st.empty()
            
             # We are currently taking the chunk size and sleep time parameters but not plotting the graph based on this data. 
             # It will be implemented in the future.
@@ -121,7 +117,6 @@ def main():
                         )
                         st.plotly_chart(fig, use_container_width=True)
                         st.write("Simulation complete!")
-               
 
         
         except Exception as e:
@@ -130,5 +125,5 @@ def main():
     else:
         st.sidebar.info("Awaiting file upload...")
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
