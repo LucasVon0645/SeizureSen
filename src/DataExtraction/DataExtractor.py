@@ -143,31 +143,27 @@ def extract_segment_from_specific_file(file):
         "eeg_data": eeg_data,
         "metadata": {
             "type": segment_type,
-            "data_length": f"{data_length} seconds",
-            "sampling_frequency": "{:.2f}".format(sampling_frequency) + " Hz",
+            "duration": data_length,
+            "sampling_frequency": sampling_frequency,
             "channels": channels
             }
     }
 
 # USAGE
 
-"""
-
-if __name__ == "__main__":
-    data_extractor = DataExtractor(data_directory="data")
-    data_extractor.load_data(dog_ids=["Dog_1", "Dog_2"], segment_types=["interictal", "preictal"]) <- Replace segment_types=["test"] to load the test segments
-    loaded_data = data_extractor.get_data()
+# if __name__ == "__main__":
+#     data_extractor = DataExtractor(data_directory="data")
+#     data_extractor.load_data(dog_ids=["Dog_1", "Dog_2"], segment_types=["interictal", "preictal"]) <- Replace segment_types=["test"] to load the test segments
+#     loaded_data = data_extractor.get_data()
 
 
-    interictal_segments = loaded_data["interictal"]
-    preictal_segments = loaded_data["preictal"]
-    for segment in interictal_segments:
-        print(f"Interictal label: {segment['label']}, Shape: {segment['eeg_data'].shape}")
-    for segment in preictal_segments:
-        print(f"Preictal label: {segment['label']}, Shape: {segment['eeg_data'].shape}")
+#     interictal_segments = loaded_data["interictal"]
+#     preictal_segments = loaded_data["preictal"]
+#     for segment in interictal_segments:
+#         print(f"Interictal label: {segment['label']}, Shape: {segment['eeg_data'].shape}")
+#     for segment in preictal_segments:
+#         print(f"Preictal label: {segment['label']}, Shape: {segment['eeg_data'].shape}")
         
 
-    metadata = data_extractor.get_metadata()
-    print("Metadata:", metadata)
-
-"""
+#     metadata = data_extractor.get_metadata()
+#     print("Metadata:", metadata)
