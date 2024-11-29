@@ -63,8 +63,8 @@ pip install -r requirements.txt
 
 1. Ensure the virtual environment is activated
 2. Ensure a pre-trained model is available in /models
-3. Run the the main script
+3. Run the command below in the **root directory of the project**
 
 ```bash
-python main.py
+streamlit run main.py
 ```

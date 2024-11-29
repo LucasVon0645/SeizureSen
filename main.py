@@ -1,3 +1,3 @@
-from src.FrontEnd.main import main
+from src.FrontEnd.app import app
 
-main()
+app()

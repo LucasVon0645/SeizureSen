@@ -112,43 +112,6 @@ class DataExtractor:
         """
         return self.metadata
 
-def extract_segment_from_specific_file(file):
-    """
-    Load a single .mat file, extract its EEG and metadata.
-    :param file_path: Path to .mat file
-    :return: A dictionary containing EEG data and associated metadata.
-    """
-    mat_data = scipy.io.loadmat(file)
-    key = next(key for key in mat_data.keys() if "segment" in key)
-    segment = mat_data[key][0, 0]
-
-    if "interictal" in file.name:
-        segment_type = "interictal"
-    elif "preictal" in file.name:
-        segment_type = "preictal"
-    else:
-        segment_type = "test"
-
-    # Extracting data and metadata from the wrapped nested structure
-
-    eeg_data = segment["data"]
-    data_length = int(segment["data_length_sec"][0, 0])
-    sampling_frequency = float(segment["sampling_frequency"][0, 0])
-    channels = segment["channels"]
-    channels = channels.flatten().tolist()
-    
-    channels = [str(channel[0])[-4:] for channel in channels]
-
-    return {
-        "eeg_data": eeg_data,
-        "metadata": {
-            "type": segment_type,
-            "duration": data_length,
-            "sampling_frequency": sampling_frequency,
-            "channels": channels
-            }
-    }
-
 # USAGE
 
 # if __name__ == "__main__":
