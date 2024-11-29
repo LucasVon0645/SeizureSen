@@ -64,6 +64,18 @@ def app():
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     dog_image_path = os.path.join(script_dir, "images/logo.png")
+    
+    # Remove whitespace from the top of the page and sidebar
+    st.markdown("""
+        <style>
+               .block-container {
+                    padding-top: 1.5rem;
+                    padding-bottom: 1rem;
+                    padding-left: 5rem;
+                    padding-right: 5rem;
+                }
+        </style>
+        """, unsafe_allow_html=True)
 
     # Customizing the style to match the blue and black theme.
     image_style = """
@@ -93,7 +105,7 @@ def app():
     col2.markdown(
         """
     <h1 style='
-        font-size: 2.6em; 
+        font-size: 1.5em; 
         color: #999999;
         font-family: "Comic Sans MS"; 
         font-weight: bold'>
@@ -169,6 +181,31 @@ def app():
                 )
 
                 placeholder = st.empty()
+                
+                # Inject JavaScript for preserving scroll position
+                st.markdown(
+                """
+                <script>
+                    const updateScroll = () => {
+                        const contentDiv = document.querySelector(".stMainBlockContainer");
+                        if (contentDiv) {
+                            const scrollPosition = localStorage.getItem("contentScrollPosition");
+                            if (scrollPosition !== null) {
+                                contentDiv.scrollTop = parseInt(scrollPosition, 10);
+                            }
+
+                            contentDiv.addEventListener("scroll", () => {
+                                localStorage.setItem("contentScrollPosition", contentDiv.scrollTop);
+                            });
+                        }
+                    };
+
+                    window.addEventListener("load", updateScroll);
+                </script>
+                """,
+                unsafe_allow_html=True,
+            )
+
 
                 if st.sidebar.button("Generate", key="Generate"):
                     # Initialize an empty array to store cumulative data
@@ -179,7 +216,7 @@ def app():
                     chunk_index = (
                         0  # index used to allow the visualization of the progress bar
                     )
-                    progress_bar = st.progress(
+                    progress_bar = st.sidebar.progress(
                         0, text="Simulation Progress"
                     )  # Initialize progress bar
 
@@ -200,23 +237,21 @@ def app():
                         # Grid for eeg signals
                         n_rows = 2
                         n_cols = 2
+                        
+                        # Create subplots 
+                        fig = make_subplots(
+                            rows=n_rows,
+                            cols=n_cols,
+                            vertical_spacing=0.2,  # Adjust spacing between subplots
+                            horizontal_spacing=0.1,
+                            subplot_titles=[f"Channel {metadata['channels'][idx]}" for idx in selected_indices]
+                            
+                        )
 
                         with placeholder.container():
                             # Update progress bar
                             progress_bar.progress(
                                 chunk_index / total_chunks, text="Simulation Progress"
-                            )
-
-                            # Create subplots with shared x-axis
-                            fig = make_subplots(
-                                rows=n_rows,
-                                cols=n_cols,
-                                vertical_spacing=0.2,  # Adjust spacing between subplots
-                                horizontal_spacing=0.1,
-                                subplot_titles=[
-                                    f"Channel {metadata['channels'][idx]}"
-                                    for idx in selected_indices
-                                ],
                             )
 
                             rows_cols_index_grid = [(1, 1), (1, 2), (2, 1), (2, 2)]
@@ -238,18 +273,19 @@ def app():
                                 fig.update_yaxes(
                                     title_text="Amplitude (µV)", row=row, col=col
                                 )
-                                fig.update_xaxes(
-                                    title_text="Time (s)",
-                                    row=row,
-                                    col=col,
-                                    title_standoff=15,
-                                )
+                                if row == 2:
+                                    fig.update_xaxes(
+                                        title_text="Time (s)",
+                                        row=row,
+                                        col=col,
+                                        title_standoff=30,
+                                    )
 
                             # Update layout
                             fig.update_layout(
                                 title="Real-Time EEG Signals",
                                 showlegend=False,  # Disable legend to avoid clutter,
-                                height=500,
+                                autosize=True
                             )
 
                             st.plotly_chart(
