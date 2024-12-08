@@ -134,7 +134,7 @@ class DataExtractor:
 
 # USAGE
 
-data_dir = "data"
+"""data_dir = "data"
 test_labels_file = "TestLabels.csv"
 
 data_extractor = DataExtractor(data_directory=data_dir, test_labels_file=test_labels_file)
@@ -153,4 +153,4 @@ for segment in test_segments:
     print(f"Test label: {segment['label']}, Shape: {segment['eeg_data'].shape}")
         
 metadata = data_extractor.get_metadata()
-print("Metadata:", metadata)
+print("Metadata:", metadata)"""
