@@ -2,6 +2,7 @@ import os
 import numpy as np
 import scipy.io
 import matplotlib.pyplot as plt
+import csv
 
 
 class DataExtractor:
@@ -9,7 +10,7 @@ class DataExtractor:
     This DataExtractor class will load and manage EEG segments
     """
 
-    def __init__(self, data_directory):
+    def __init__(self, data_directory, test_labels_file):
         """
         Initialize the DataExtractor class with root directory
         :param data_directory: Data folder path
@@ -19,8 +20,15 @@ class DataExtractor:
         self.data_directory = os.path.normpath(
             os.path.join(script_dir, "..", "..", data_directory)
         )
+        self.test_labels_file = os.path.join(self.data_directory, test_labels_file)
         self.data = {"interictal": [], "preictal": [], "test": []}
         self.metadata = {"sampling_frequency": None, "channels": None}
+
+        self.test_labels = {}
+        if os.path.exists(self.test_labels_file):
+            self._load_test_labels()
+        else:
+            print(f"Test labels file not found: {self.test_labels_file}")
 
     def _load_segment(self, file_path):
         """
@@ -46,6 +54,18 @@ class DataExtractor:
             "sampling_frequency": sampling_frequency,
             "channels": channels,
         }
+
+    def _load_test_labels(self):
+        """
+        Load test labels from a CSV file and store them in a dictionary.
+        """
+        with open(self.test_labels_file, "r") as file:
+            reader = csv.reader(file)
+            next(reader) #I skipped the first row of the csv file because it's irrelevant. If you delete the first row in your file, please comment this line
+            for row in reader:
+                file_name, label = row
+                self.test_labels[file_name] = int(label)
+        print(f"Loaded {len(self.test_labels)} test labels from {self.test_labels_file}")
 
     def load_data(self, dog_ids, segment_types=None):
         """
@@ -75,7 +95,7 @@ class DataExtractor:
                     label = 1
                 elif "test" in file_name and "test" in segment_types:
                     segment_type = "test"
-                    label = None
+                    label = self.test_labels.get(file_name, None)  # Assign label from test labels
 
                 if segment_type is None:
                     continue
@@ -114,19 +134,23 @@ class DataExtractor:
 
 # USAGE
 
-# if __name__ == "__main__":
-#     data_extractor = DataExtractor(data_directory="data")
-#     data_extractor.load_data(dog_ids=["Dog_1", "Dog_2"], segment_types=["interictal", "preictal"]) <- Replace segment_types=["test"] to load the test segments
-#     loaded_data = data_extractor.get_data()
+data_dir = "data"
+test_labels_file = "TestLabels.csv"
 
+data_extractor = DataExtractor(data_directory=data_dir, test_labels_file=test_labels_file)
+data_extractor.load_data(dog_ids=["Dog_1", "Dog_2"], segment_types=["interictal", "preictal", "test"])
+loaded_data = data_extractor.get_data()
 
-#     interictal_segments = loaded_data["interictal"]
-#     preictal_segments = loaded_data["preictal"]
-#     for segment in interictal_segments:
-#         print(f"Interictal label: {segment['label']}, Shape: {segment['eeg_data'].shape}")
-#     for segment in preictal_segments:
-#         print(f"Preictal label: {segment['label']}, Shape: {segment['eeg_data'].shape}")
+interictal_segments = loaded_data["interictal"]
+preictal_segments = loaded_data["preictal"]
+test_segments = loaded_data["test"]
+
+for segment in interictal_segments:
+    print(f"Interictal label: {segment['label']}, Shape: {segment['eeg_data'].shape}")
+for segment in preictal_segments:
+    print(f"Preictal label: {segment['label']}, Shape: {segment['eeg_data'].shape}")
+for segment in test_segments:
+    print(f"Test label: {segment['label']}, Shape: {segment['eeg_data'].shape}")
         
-
-#     metadata = data_extractor.get_metadata()
-#     print("Metadata:", metadata)
+metadata = data_extractor.get_metadata()
+print("Metadata:", metadata)
