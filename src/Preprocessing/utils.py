@@ -42,7 +42,7 @@ def load_preprocessed_data(data_directory, file_name="preprocessed_data.npz"):
 
 
 
-data_dir = "data"
+"""data_dir = "data"
 test_labels_file = "TestLabels.csv"
 
 data_extractor = DataExtractor(data_directory=data_dir, test_labels_file=test_labels_file)
@@ -63,4 +63,4 @@ if interictal_segments:
     slices = eeg_slices(first_interictal_segment, sampling_freq, window_duration)
     print(f"Number of slices: {len(slices)}")
     for idx, slice_segment in enumerate(slices):
-        print(f"Slice {idx + 1} Shape: {slice_segment.shape}")
+        print(f"Slice {idx + 1} Shape: {slice_segment.shape}")"""
