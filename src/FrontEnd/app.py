@@ -36,6 +36,11 @@ def simulate_streaming(data, chunk_size, update_period):
         yield chunk
         time.sleep(update_period)
 
+# Load CSS from external file
+def load_css():
+    with open("src/FrontEnd/style.css", "r") as file:
+        css = file.read()
+    return css
 
 def app():
     """
@@ -65,36 +70,8 @@ def app():
 
     dog_image_path = os.path.join(script_dir, "images/logo.png")
     
-    # Remove whitespace from the top of the page and sidebar
-    st.markdown("""
-        <style>
-               .block-container {
-                    padding-top: 1.5rem;
-                    padding-bottom: 1rem;
-                    padding-left: 5rem;
-                    padding-right: 5rem;
-                }
-        </style>
-        """, unsafe_allow_html=True)
-
-    # Customizing the style to match the blue and black theme.
-    image_style = """
-    <style>
-        .dog-image {
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-            width: 50%;
-            border-radius: 15px;
-        }
-        body {
-            background-color: #ffffff;  # Black background
-            color: #ffffff;  # White text
-        }
-    </style>
-    """
-    # Inserting the image with the custom styling.
-    st.markdown(image_style, unsafe_allow_html=True)
+    # Inject custom CSS from the external file
+    st.markdown(f"<style>{load_css()}</style>", unsafe_allow_html=True)
 
     # Heading and left-aligned image
     col1, col2 = st.columns(
@@ -104,11 +81,7 @@ def app():
     # Adding heading in the second column.
     col2.markdown(
         """
-    <h1 style='
-        font-size: 1.5em; 
-        color: #999999;
-        font-family: "Comic Sans MS"; 
-        font-weight: bold'>
+    <h1 class="main-title">
         Seizure Prediction App
     </h1>
     """,
@@ -136,6 +109,8 @@ def app():
             data = extract_eeg_from_specific_file(uploaded_file)
             eeg_data = data["eeg_data"]
             metadata = data["metadata"]
+            
+            type_eeg = metadata["type"]
 
             display_metadata_in_expander(metadata)
 
@@ -182,30 +157,6 @@ def app():
 
                 placeholder = st.empty()
                 
-                # Inject JavaScript for preserving scroll position
-                st.markdown(
-                """
-                <script>
-                    const updateScroll = () => {
-                        const contentDiv = document.querySelector(".stMainBlockContainer");
-                        if (contentDiv) {
-                            const scrollPosition = localStorage.getItem("contentScrollPosition");
-                            if (scrollPosition !== null) {
-                                contentDiv.scrollTop = parseInt(scrollPosition, 10);
-                            }
-
-                            contentDiv.addEventListener("scroll", () => {
-                                localStorage.setItem("contentScrollPosition", contentDiv.scrollTop);
-                            });
-                        }
-                    };
-
-                    window.addEventListener("load", updateScroll);
-                </script>
-                """,
-                unsafe_allow_html=True,
-            )
-
 
                 if st.sidebar.button("Generate", key="Generate"):
                     # Initialize an empty array to store cumulative data
@@ -295,6 +246,12 @@ def app():
                             chunk_index += 1  # Update chunk index for visualization bar
 
                     st.success("Simulation completed!")
+                    
+                    if type_eeg == "preictal":
+                        st.error("A seizure will likely happen!", icon="🚨")
+                    else:
+                        st.warning("No seizure predicted", icon="😌")
+                        
 
         except Exception as e:
             st.error(f"Error loading the file: {e}")
