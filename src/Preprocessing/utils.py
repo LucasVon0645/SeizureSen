@@ -42,18 +42,23 @@ def load_preprocessed_data(data_directory, file_name="preprocessed_data.npz"):
     print(f"Data loaded from {file_path}")
     return {key: data[key] for key in data}
 
-def divide_into_frequency_chunks(eeg_data, sampling_freq):
-    frequency_bands = {
+def get_frequency_bands():
+    return {
         "delta": (0.1, 4),  # Delta: Deep sleep, restorative sleep and unconscious brain activity.
         "theta": (4, 8),  # Theta: Relaxation, light sleep, drowsiness and meditation, often linked to creativity.
-        "alpha": (8, 12),  # Alpha: Calm wakefulness, relaxed state and idle mental processes, associated with resting but alert.
+        "alpha": (8, 12), # Alpha: Calm wakefulness, relaxed state and idle mental processes, associated with resting but alert.
         "beta": (12, 30),  # Beta: Active thinking, problem-solving, decision-making and focused mental activity.
         "low_gamma": (30, 50),  # Low Gamma: Higher cognitive functions, learning and memory processing.
         "mid_gamma": (50, 70),  # Mid Gamma: Advanced problem-solving, information processing and heightened perception.
-        "high_gamma_1": (70, 100),  # High Gamma 1: Enhanced brain activity during tasks requiring attention or conscious focus.
-        "high_gamma_2": (100, 180)  # High Gamma 2: Intense brain activity during high-level processing and cognitive tasks.
+        "high_gamma_1": (70, 100),
+        # High Gamma 1: Enhanced brain activity during tasks requiring attention or conscious focus.
+        "high_gamma_2": (100, 180)
+        # High Gamma 2: Intense brain activity during high-level processing and cognitive tasks.
     }
 
+def divide_into_frequency_chunks(eeg_data, sampling_freq):
+
+    frequency_bands = get_frequency_bands()
     num_samples = eeg_data.shape[1]
     freqs = np.fft.rfftfreq(num_samples, d=1/sampling_freq) # Frequency bins
     fft_magnitude = np.abs(np.fft.rfft(eeg_data, axis=1)) #FFT Magnitude
@@ -74,7 +79,7 @@ def calculate_band_features(frequency_band_data):
     # This function returns a dictionary containing band features for each band
 
     for band_name, band_data in frequency_band_data.items():
-        log_amplitude = np.log1p(band_data)  # log(1 + amplitude)
+        log_amplitude = np.log10(np.clip(band_data, a_min=1e-10, a_max=None))
 
         mean_log_amplitude = np.mean(log_amplitude, axis=1)  # Mean for each channel
         std_log_amplitude = np.std(log_amplitude, axis=1)  # Standard deviation for each channel
@@ -84,13 +89,12 @@ def calculate_band_features(frequency_band_data):
 
     return band_features
 
-
 """
 data_dir = "data"
 test_labels_file = "TestLabels.csv"
 
 data_extractor = DataExtractor(data_directory=data_dir, test_labels_file=test_labels_file)
-data_extractor.load_data(dog_ids=["Dog_1", "Dog_2"], segment_types=["interictal", "preictal", "test"])
+data_extractor.load_data(dog_ids=["Dog_1"], segment_types=["interictal", "preictal", "test"])
 loaded_data = data_extractor.get_data()
 
 interictal_segments = loaded_data["interictal"]
@@ -173,4 +177,4 @@ def plot_alpha_band_features(interictal_means, preictal_means):
 
 # Plot the alpha band features
 plot_alpha_band_features(interictal_alpha_means, preictal_alpha_means)
-"""
+ """
