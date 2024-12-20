@@ -14,11 +14,12 @@ def compute_pca(slice_data):
     Returns:
     - pca_matrix (numpy.ndarray): A 16x16 matrix after applying PCA.
     """
+    # Perform PCA on the slice data with pricipal components = 16
     pca = PCA(n_components=16)
-    # Transpose slice_data to shape (slice_length, 16) for PCA
+    # Fit and transform the slice data
     pca_result = pca.fit_transform(slice_data)
-    # Return the transformed data with shape (16, 16)
-    pca_matrix = np.log10(np.abs(pca_result))  # Log transformation for stability
+    # Log transformation for stability
+    pca_matrix = np.log10(np.abs(pca_result))
     return pca_matrix
 
 
