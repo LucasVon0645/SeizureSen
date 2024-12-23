@@ -12,6 +12,19 @@
                 "--server.port",
                 "2000"
             ]
+        },
+        {
+            "name": "Python: Debug Any Script",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",  // Automatically runs the currently open file
+            "cwd": "${workspaceFolder}",  // Ensures the script runs from the root folder,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"  // Add project root to PYTHONPATH
+            },
+            "python": "${workspaceFolder}/venv/Scripts/python.exe",  // Explicitly set the interpreter
+            "console": "integratedTerminal",
+            "justMyCode": true
         }
     ]
 }

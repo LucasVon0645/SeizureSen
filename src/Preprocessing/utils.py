@@ -1,27 +1,33 @@
 import numpy as np
 import os
-from src.DataExtraction.DataExtractor import DataExtractor
-import matplotlib.pyplot as plt
+import scipy.signal
 
+# from src.DataExtraction.DataExtractor import DataExtractor
+# import matplotlib.pyplot as plt
 
 
 def eeg_slices(eeg_data, sampling_freq, window_duration):
-    slice_samples = int(sampling_freq*window_duration) #no. of samples per slice
-    total_samples = eeg_data.shape[1] #total no. of samples
+    slice_samples = int(sampling_freq * window_duration)  # no. of samples per slice
+    total_samples = eeg_data.shape[1]  # total no. of samples
     slices = []
-    for i in range(0,total_samples,slice_samples):
-        if i+slice_samples <= total_samples: #skipping the last slice if it doesn't fit in 30s window
-            slices.append(eeg_data[:,i:i+slice_samples])
+    for i in range(0, total_samples, slice_samples):
+        if (
+            i + slice_samples <= total_samples
+        ):  # skipping the last slice if it doesn't fit in 30s window
+            slices.append(eeg_data[:, i : i + slice_samples])
     return slices
 
 
-def save_preprocessed_data(data_directory, file_name="preprocessed_data.npz", data=None):
-    if data is None:
+def save_preprocessed_data(directory, filename="preprocessed_data.npz", **data):
+    if not data:
         raise ValueError("No data provided to save.")
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    save_dir = os.path.normpath(os.path.join(script_dir, "..", "..", data_directory))
-    file_path = os.path.join(save_dir, file_name)
+    # Ensure the directory exists
+    save_dir = os.path.normpath(directory)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    file_path = os.path.join(save_dir, filename)
 
     # Save data
     np.savez(file_path, **data)
@@ -33,35 +39,55 @@ def load_preprocessed_data(data_directory, file_name="preprocessed_data.npz"):
     load_dir = os.path.normpath(os.path.join(script_dir, "..", "..", data_directory))
     file_path = os.path.join(load_dir, file_name)
 
-    #Check if the file exists
+    # Check if the file exists
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File not found: {file_path}")
 
-    #Load data
+    # Load data
     data = np.load(file_path, allow_pickle=True)
     print(f"Data loaded from {file_path}")
     return {key: data[key] for key in data}
 
+
 def get_frequency_bands():
     return {
-        "delta": (0.1, 4),  # Delta: Deep sleep, restorative sleep and unconscious brain activity.
-        "theta": (4, 8),  # Theta: Relaxation, light sleep, drowsiness and meditation, often linked to creativity.
-        "alpha": (8, 12), # Alpha: Calm wakefulness, relaxed state and idle mental processes, associated with resting but alert.
-        "beta": (12, 30),  # Beta: Active thinking, problem-solving, decision-making and focused mental activity.
-        "low_gamma": (30, 50),  # Low Gamma: Higher cognitive functions, learning and memory processing.
-        "mid_gamma": (50, 70),  # Mid Gamma: Advanced problem-solving, information processing and heightened perception.
+        "delta": (
+            0.1,
+            4,
+        ),  # Delta: Deep sleep, restorative sleep and unconscious brain activity.
+        "theta": (
+            4,
+            8,
+        ),  # Theta: Relaxation, light sleep, drowsiness and meditation, often linked to creativity.
+        "alpha": (
+            8,
+            12,
+        ),  # Alpha: Calm wakefulness, relaxed state and idle mental processes, associated with resting but alert.
+        "beta": (
+            12,
+            30,
+        ),  # Beta: Active thinking, problem-solving, decision-making and focused mental activity.
+        "low_gamma": (
+            30,
+            50,
+        ),  # Low Gamma: Higher cognitive functions, learning and memory processing.
+        "mid_gamma": (
+            50,
+            70,
+        ),  # Mid Gamma: Advanced problem-solving, information processing and heightened perception.
         "high_gamma_1": (70, 100),
         # High Gamma 1: Enhanced brain activity during tasks requiring attention or conscious focus.
-        "high_gamma_2": (100, 180)
+        "high_gamma_2": (100, 180),
         # High Gamma 2: Intense brain activity during high-level processing and cognitive tasks.
     }
+
 
 def divide_into_frequency_chunks(eeg_data, sampling_freq):
 
     frequency_bands = get_frequency_bands()
     num_samples = eeg_data.shape[1]
-    freqs = np.fft.rfftfreq(num_samples, d=1/sampling_freq) # Frequency bins
-    fft_magnitude = np.abs(np.fft.rfft(eeg_data, axis=1)) #FFT Magnitude
+    freqs = np.fft.rfftfreq(num_samples, d=1 / sampling_freq)  # Frequency bins
+    fft_magnitude = np.abs(np.fft.rfft(eeg_data, axis=1))  # FFT Magnitude
 
     frequency_band_data = {}
 
@@ -75,26 +101,116 @@ def divide_into_frequency_chunks(eeg_data, sampling_freq):
 
 def calculate_band_features(frequency_band_data):
 
-    band_features = {} # Band features are the mean log amplitude and standard deviation.
+    band_features = (
+        {}
+    )  # Band features are the mean log amplitude and standard deviation.
     # This function returns a dictionary containing band features for each band
 
     for band_name, band_data in frequency_band_data.items():
         log_amplitude = np.log10(np.clip(band_data, a_min=1e-10, a_max=None))
 
         mean_log_amplitude = np.mean(log_amplitude, axis=1)  # Mean for each channel
-        std_log_amplitude = np.std(log_amplitude, axis=1)  # Standard deviation for each channel
+        std_log_amplitude = np.std(
+            log_amplitude, axis=1
+        )  # Standard deviation for each channel
 
         band_features[f"{band_name}_mean"] = mean_log_amplitude
         band_features[f"{band_name}_std"] = std_log_amplitude
 
     return band_features
 
+
+def resample(eeg_segment, new_sampling_freq, time_length=600):
+    """
+    Resamples the given EEG data to a new sampling rate.
+
+    Parameters:
+    eeg_data (numpy.ndarray): The EEG data to be resampled. Expected to be a 2D array where rows represent channels and columns represent time points.
+    newSamplingRate (int): The new sampling rate in Hz.
+    timeLength (int, optional): The length of time in seconds for which the data is to be resampled. Default is 600 seconds.
+
+    Returns:
+    numpy.ndarray: The resampled EEG data.
+    """
+    return scipy.signal.resample(eeg_segment, new_sampling_freq * time_length, axis=1)
+
+
+def butterworth_bandpass_filter(
+    eeg_segment=np.ndarray, order=int, band=None, sampling_freq=400
+):
+    """
+    Applies a Butterworth bandpass filter to an EEG signal segment.
+
+    Parameters:
+    - eeg_segment: np.ndarray
+        The input EEG signal, typically a 2D array (channels x samples).
+    - order: int
+        The order of the Butterworth filter (higher values = sharper cutoff).
+    - band: list of float, optional (default: [0.1, 180])
+        The passband frequencies [low_cutoff, high_cutoff] in Hz.
+    - frequency: float, optional (default: 400)
+        The sampling frequency of the EEG data in Hz.
+
+    Returns:
+    - np.ndarray
+        The filtered EEG signal.
+    """
+
+    if band is None:
+        band = [0.1, 180]
+    # Compute the filter coefficients for the Butterworth bandpass filter
+    b, a = scipy.signal.butter(
+        order, np.array(band) / (sampling_freq / 2.0), btype="band"
+    )
+
+    # Apply the filter to the EEG data along the time axis (axis=1)
+    return scipy.signal.lfilter(b, a, eeg_segment, axis=1)
+
+
+def resample_bandpass_filter(
+    eeg_segment, order=5, band=None, new_sampling_freq=400, time_length=600
+):
+    """
+    Resamples the given EEG data to a new sampling rate and applies a Butterworth bandpass filter.
+
+    Parameters:
+    - eeg_segment: dict
+        A dictionary containing the EEG data and its label. Expected keys are "eeg_data"
+        (2D array where rows represent channels and columns represent time points) and "label".
+    - order: int (default: 5)
+        The order of the Butterworth filter (higher values = sharper cutoff).
+    - band: list of float, optional (default: [0.1, 180])
+        The passband frequencies [low_cutoff, high_cutoff] in Hz.
+    - new_sampling_freq: int
+        The new sampling rate in Hz.
+    - time_length: int, optional (default: 600)
+        The length of time in seconds for which the data is to be resampled.
+
+    Returns:
+    - tuple
+        A tuple containing the resampled and filtered EEG data (np.ndarray) and the label.
+    """
+    eeg_data = eeg_segment["eeg_data"]
+    label = eeg_segment["label"]
+
+    resampled_data = resample(eeg_data, new_sampling_freq, time_length)
+    filtered_data = butterworth_bandpass_filter(
+        resampled_data, order, band, new_sampling_freq
+    )
+
+    return filtered_data, label
+
+
 """
 data_dir = "data"
 test_labels_file = "TestLabels.csv"
 
-data_extractor = DataExtractor(data_directory=data_dir, test_labels_file=test_labels_file)
-data_extractor.load_data(dog_ids=["Dog_1"], segment_types=["interictal", "preictal", "test"])
+data_extractor = DataExtractor(
+    data_directory=data_dir, test_labels_file=test_labels_file
+)
+data_extractor.load_data(
+    dog_ids=["Dog_1"], segment_types=["interictal", "preictal", "test"]
+)
 loaded_data = data_extractor.get_data()
 
 interictal_segments = loaded_data["interictal"]
@@ -156,16 +272,30 @@ if preictal_segments:
 def extract_alpha_means(band_features_list):
     return [features["alpha_mean"] for features in band_features_list]
 
+
 # Extract alpha band features for interictal and preictal data
 interictal_alpha_means = extract_alpha_means(interictal_band_features)
 preictal_alpha_means = extract_alpha_means(preictal_band_features)
+
 
 # Plot alpha band features for interictal and preictal data across all 16 channels
 def plot_alpha_band_features(interictal_means, preictal_means):
 
     plt.figure(figsize=(10, 6))
-    plt.plot(range(len(interictal_means)), interictal_means, label="Interictal - Alpha Mean", linestyle='-', marker='o')
-    plt.plot(range(len(preictal_means)), preictal_means, label="Preictal - Alpha Mean", linestyle='-', marker='x')
+    plt.plot(
+        range(len(interictal_means)),
+        interictal_means,
+        label="Interictal - Alpha Mean",
+        linestyle="-",
+        marker="o",
+    )
+    plt.plot(
+        range(len(preictal_means)),
+        preictal_means,
+        label="Preictal - Alpha Mean",
+        linestyle="-",
+        marker="x",
+    )
 
     plt.xlabel("Slice Index")
     plt.ylabel("Alpha Band Mean Log Amplitude")
@@ -175,6 +305,7 @@ def plot_alpha_band_features(interictal_means, preictal_means):
     plt.tight_layout()
     plt.show()
 
+
 # Plot the alpha band features
 plot_alpha_band_features(interictal_alpha_means, preictal_alpha_means)
- """
+"""

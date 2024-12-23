@@ -86,6 +86,7 @@ class DataExtractor:
                 file_path = os.path.join(dog_path, file_name)
 
                 # Find out which type of segment it is
+                label = None
                 segment_type = None
                 if "interictal" in file_name and "interictal" in segment_types:
                     segment_type = "interictal"
