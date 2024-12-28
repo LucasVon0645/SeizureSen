@@ -51,34 +51,14 @@ def load_preprocessed_data(data_directory, file_name="preprocessed_data.npz"):
 
 def get_frequency_bands():
     return {
-        "delta": (
-            0.1,
-            4,
-        ),  # Delta: Deep sleep, restorative sleep and unconscious brain activity.
-        "theta": (
-            4,
-            8,
-        ),  # Theta: Relaxation, light sleep, drowsiness and meditation, often linked to creativity.
-        "alpha": (
-            8,
-            12,
-        ),  # Alpha: Calm wakefulness, relaxed state and idle mental processes, associated with resting but alert.
-        "beta": (
-            12,
-            30,
-        ),  # Beta: Active thinking, problem-solving, decision-making and focused mental activity.
-        "low_gamma": (
-            30,
-            50,
-        ),  # Low Gamma: Higher cognitive functions, learning and memory processing.
-        "mid_gamma": (
-            50,
-            70,
-        ),  # Mid Gamma: Advanced problem-solving, information processing and heightened perception.
-        "high_gamma_1": (70, 100),
-        # High Gamma 1: Enhanced brain activity during tasks requiring attention or conscious focus.
-        "high_gamma_2": (100, 180),
-        # High Gamma 2: Intense brain activity during high-level processing and cognitive tasks.
+        "delta": (0.1,4), # Delta: Deep sleep, restorative sleep and unconscious brain activity.
+        "theta": (4, 8), # Theta: Relaxation, light sleep, drowsiness and meditation, often linked to creativity.
+        "alpha": (8,12), # Alpha: Calm wakefulness, relaxed state and idle mental processes, associated with resting but alert.
+        "beta": (12,30), # Beta: Active thinking, problem-solving, decision-making and focused mental activity.
+        "low_gamma": (30,50), # Low Gamma: Higher cognitive functions, learning and memory processing.
+        "mid_gamma": (50,70), # Mid Gamma: Advanced problem-solving, information processing and heightened perception.
+        "high_gamma_1": (70, 100), # High Gamma 1: Enhanced brain activity during tasks requiring attention or conscious focus.
+        "high_gamma_2": (100, 180), # High Gamma 2: Intense brain activity during high-level processing and cognitive tasks.
     }
 
 
