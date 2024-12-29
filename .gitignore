@@ -2,7 +2,9 @@
 data/*
 models/*
 
-
+# But do not ignore
+!/models/config/
+!/data/TestLabels.csv
 !.gitkeep
 
 *.h5

@@ -1,12 +1,19 @@
 import numpy as np
 import os
+import tensorflow as tf
 import scipy.signal
 
-# from src.DataExtraction.DataExtractor import DataExtractor
-# import matplotlib.pyplot as plt
-
-
 def eeg_slices(eeg_data, sampling_freq, window_duration):
+    """
+    Slices EEG data into smaller segments based on the specified window duration.
+    Parameters:
+    eeg_data (numpy.ndarray): The EEG data to be sliced, with shape (channels, samples).
+    sampling_freq (int): The sampling frequency of the EEG data in Hz.
+    window_duration (float): The duration of each window in seconds.
+    Returns:
+    list: A list of numpy.ndarray, each containing a slice of the EEG data.
+    """
+
     slice_samples = int(sampling_freq * window_duration)  # no. of samples per slice
     total_samples = eeg_data.shape[1]  # total no. of samples
     slices = []
@@ -19,6 +26,18 @@ def eeg_slices(eeg_data, sampling_freq, window_duration):
 
 
 def save_preprocessed_data(directory, filename="preprocessed_data.npz", **data):
+    """
+    Save preprocessed data to a specified directory in .npz format.
+    Parameters:
+    directory (str): The directory where the file will be saved.
+    filename (str, optional): The name of the file to save the data. Defaults to "preprocessed_data.npz".
+    **data: Arbitrary keyword arguments representing the data to be saved.
+    Raises:
+    ValueError: If no data is provided to save.
+    Example:
+    save_preprocessed_data('/path/to/save', data1=array1, data2=array2)
+    """
+
     if not data:
         raise ValueError("No data provided to save.")
 
@@ -35,6 +54,21 @@ def save_preprocessed_data(directory, filename="preprocessed_data.npz", **data):
 
 
 def load_preprocessed_data(data_directory, file_name="preprocessed_data.npz"):
+    """
+    Load preprocessed data from a specified directory and file.
+    Parameters:
+    data_directory (str): The directory where the preprocessed data file is located.
+    file_name (str, optional): The name of the preprocessed data file. Defaults to "preprocessed_data.npz".
+    Returns:
+    dict: A dictionary containing the loaded data.
+    Raises:
+    FileNotFoundError: If the specified file does not exist.
+    Example:
+    >>> data = load_preprocessed_data("data")
+    >>> print(data.keys())
+    dict_keys(['key1', 'key2', 'key3'])
+    """
+
     script_dir = os.path.dirname(os.path.abspath(__file__))
     load_dir = os.path.normpath(os.path.join(script_dir, "..", "..", data_directory))
     file_path = os.path.join(load_dir, file_name)
@@ -50,19 +84,43 @@ def load_preprocessed_data(data_directory, file_name="preprocessed_data.npz"):
 
 
 def get_frequency_bands():
+    """
+    Returns a dictionary of EEG frequency bands with their corresponding frequency ranges in Hz.
+    Frequency bands:
+        - delta: (0.1, 4) - Deep sleep, restorative sleep, and unconscious brain activity.
+        - theta: (4, 8) - Relaxation, light sleep, drowsiness, and meditation, often linked to creativity.
+        - alpha: (8, 12) - Calm wakefulness, relaxed state, and idle mental processes, associated with resting but alert.
+        - beta: (12, 30) - Active thinking, problem-solving, decision-making, and focused mental activity.
+        - low_gamma: (30, 50) - Higher cognitive functions, learning, and memory processing.
+        - mid_gamma: (50, 70) - Advanced problem-solving, information processing, and heightened perception.
+        - high_gamma_1: (70, 100) - Enhanced brain activity during tasks requiring attention or conscious focus.
+        - high_gamma_2: (100, 180) - Intense brain activity during high-level processing and cognitive tasks.
+    Returns:
+        dict: A dictionary where keys are frequency band names and values are tuples representing the frequency range in Hz.
+    """
+
     return {
-        "delta": (0.1,4), # Delta: Deep sleep, restorative sleep and unconscious brain activity.
-        "theta": (4, 8), # Theta: Relaxation, light sleep, drowsiness and meditation, often linked to creativity.
-        "alpha": (8,12), # Alpha: Calm wakefulness, relaxed state and idle mental processes, associated with resting but alert.
-        "beta": (12,30), # Beta: Active thinking, problem-solving, decision-making and focused mental activity.
-        "low_gamma": (30,50), # Low Gamma: Higher cognitive functions, learning and memory processing.
-        "mid_gamma": (50,70), # Mid Gamma: Advanced problem-solving, information processing and heightened perception.
-        "high_gamma_1": (70, 100), # High Gamma 1: Enhanced brain activity during tasks requiring attention or conscious focus.
-        "high_gamma_2": (100, 180), # High Gamma 2: Intense brain activity during high-level processing and cognitive tasks.
+        "delta": (0.1, 4),
+        "theta": (4, 8),
+        "alpha": (8, 12),
+        "beta": (12, 30),
+        "low_gamma": (30, 50),
+        "mid_gamma": (50, 70),
+        "high_gamma_1": (70, 100),
+        "high_gamma_2": (100, 180),
     }
 
 
 def divide_into_frequency_chunks(eeg_data, sampling_freq):
+    """
+    Divide EEG data into frequency chunks based on predefined frequency bands.
+    Parameters:
+    eeg_data (numpy.ndarray): The EEG data array of shape (n_channels, n_samples).
+    sampling_freq (float): The sampling frequency of the EEG data in Hz.
+    Returns:
+    dict: A dictionary where keys are frequency band names and values are the FFT magnitudes
+          within those frequency bands for each channel.
+    """
 
     frequency_bands = get_frequency_bands()
     num_samples = eeg_data.shape[1]
@@ -80,6 +138,19 @@ def divide_into_frequency_chunks(eeg_data, sampling_freq):
 
 
 def calculate_band_features(frequency_band_data):
+    """
+    Calculate band features for given frequency band data.
+    This function computes the mean log amplitude and standard deviation of the log amplitude
+    for each frequency band and each channel. The results are returned in a dictionary.
+    Parameters:
+    frequency_band_data (dict): A dictionary where keys are band names (str) and values are
+                                numpy arrays of shape (channels, samples) representing the
+                                frequency band data for each channel.
+    Returns:
+    dict: A dictionary containing the mean log amplitude and standard deviation of the log
+          amplitude for each band. The keys are in the format '{band_name}_mean' and
+          '{band_name}_std', and the values are numpy arrays of shape (channels,).
+    """
 
     band_features = (
         {}
@@ -147,7 +218,7 @@ def butterworth_bandpass_filter(
     return scipy.signal.lfilter(b, a, eeg_segment, axis=1)
 
 
-def resample_bandpass_filter(
+def resample_and_apply_bandpass_filter(
     eeg_segment, order=5, band=None, new_sampling_freq=400, time_length=600
 ):
     """
@@ -181,111 +252,72 @@ def resample_bandpass_filter(
     return filtered_data, label
 
 
-"""
-data_dir = "data"
-test_labels_file = "TestLabels.csv"
+def transform_to_tensor(
+    features: list[dict], labels: list[int], steps: int
+) -> tuple[tf.Tensor, tf.Tensor]:
+    """
+    Transform a list of dictionaries into a 4D tensor and group labels.
 
-data_extractor = DataExtractor(
-    data_directory=data_dir, test_labels_file=test_labels_file
-)
-data_extractor.load_data(
-    dog_ids=["Dog_1"], segment_types=["interictal", "preictal", "test"]
-)
-loaded_data = data_extractor.get_data()
+    Parameters:
+        features: list of dictionaries
+            Each dictionary contains keys (features) mapping to arrays (channels).
+        steps: int
+            Number of slices to aggregate into one sample slot.
+        labels: list of int
+            List of labels corresponding to each slice. Must be the same length as data.
 
-interictal_segments = loaded_data["interictal"]
-metadata = data_extractor.get_metadata()
-print("Metadata:", metadata)
-sampling_freq = metadata["sampling_frequency"]
-window_duration = 30
+    Returns:
+        tuple: (4D keras tensor, 1D tensor of labels)
+            Shape of tensor: (n_samples, n_channels, features, steps)
+            Shape of labels_tensor: (n_samples,)
 
-preictal_segments = loaded_data["preictal"]
+    Raises:
+        ValueError: If the total number of slices is not divisible by the number of
+        steps or if labels within a group are not the same.
+    """
+    if len(features) != len(labels):
+        raise ValueError("The length of features and labels must be the same.")
 
-if interictal_segments:
-    first_interictal_segment = interictal_segments[0]["eeg_data"]
-    print(f"Original Interictal Segment Shape: {first_interictal_segment.shape}")
+    # Extract keys (features) and validate consistency
+    feature_keys = features[0].keys()
+    n_channels = len(features[0][list(feature_keys)[0]])  # Number of channels
 
-    # Apply eeg_slices
-    slices = eeg_slices(first_interictal_segment, sampling_freq, window_duration)
-    print(f"Number of slices: {len(slices)}")
+    # Flatten the features into a list of features for each slice
+    all_slices = []
+    for slice_dict in features:
+        slice_features = tf.convert_to_tensor(
+            [slice_dict[key] for key in feature_keys], dtype=tf.float32
+        )  # Shape: (features, n_channels)
+        all_slices.append(
+            tf.transpose(slice_features)
+        )  # Transpose to (n_channels, features)
 
-    interictal_band_features = []  # To store band features for all slices
+    # Stack all slices into a 3D tensor (total_slices, n_channels, features)
+    all_slices = tf.stack(all_slices)  # Shape: (total_slices, n_channels, features)
 
-    for idx, slice_segment in enumerate(slices):
-        print(f"Slice {idx + 1} Shape: {slice_segment.shape}")
+    # Ensure the total number of slices is divisible by steps
+    total_slices = all_slices.shape[0]
+    if total_slices % steps != 0:
+        raise ValueError(
+            "The total number of slices must be divisible by the number of steps."
+        )
 
-        # Divide into frequency bands
-        frequency_band_data = divide_into_frequency_chunks(slice_segment, sampling_freq)
-        print(f"Frequency bands divided for Slice {idx + 1}.")
+    n_samples = total_slices // steps  # Number of sample slots
 
-        # Calculate mean log amplitude and standard deviation
-        band_features = calculate_band_features(frequency_band_data)
-        print(f"Band features calculated for Slice {idx + 1}.")
+    # Reshape into (n_samples, steps, n_channels, features)
+    reshaped_slices = tf.reshape(all_slices, (n_samples, steps, n_channels, -1))
 
-        interictal_band_features.append(band_features)
+    # Transpose to (n_samples, n_channels, features, steps)
+    tensor = tf.transpose(reshaped_slices, perm=[0, 2, 3, 1])
 
-    print("\nInterictal frequency band processing and feature extraction complete.")
+    # Group labels
+    labels_tensor = []
+    for i in range(n_samples):
+        group_labels = labels[i * steps : (i + 1) * steps]
+        if len(set(group_labels)) != 1:
+            raise ValueError("All slices in a group must have the same label.")
+        labels_tensor.append(group_labels[0])
 
-if preictal_segments:
-    first_preictal_segment = preictal_segments[0]["eeg_data"]
-    print(f"Original Preictal Segment Shape: {first_preictal_segment.shape}")
+    labels_tensor = tf.convert_to_tensor(labels_tensor, dtype=tf.int32)
 
-    slices = eeg_slices(first_preictal_segment, sampling_freq, window_duration)
-    print(f"Number of slices: {len(slices)}")
-
-    preictal_band_features = []
-
-    for idx, slice_segment in enumerate(slices):
-        print(f"Slice {idx + 1} Shape: {slice_segment.shape}")
-
-        frequency_band_data = divide_into_frequency_chunks(slice_segment, sampling_freq)
-        print(f"Frequency bands divided for Slice {idx + 1}.")
-
-        band_features = calculate_band_features(frequency_band_data)
-        print(f"Band features calculated for Slice {idx + 1}.")
-
-        preictal_band_features.append(band_features)
-
-    print("\nPreictal frequency band processing and feature extraction complete.")
-
-
-def extract_alpha_means(band_features_list):
-    return [features["alpha_mean"] for features in band_features_list]
-
-
-# Extract alpha band features for interictal and preictal data
-interictal_alpha_means = extract_alpha_means(interictal_band_features)
-preictal_alpha_means = extract_alpha_means(preictal_band_features)
-
-
-# Plot alpha band features for interictal and preictal data across all 16 channels
-def plot_alpha_band_features(interictal_means, preictal_means):
-
-    plt.figure(figsize=(10, 6))
-    plt.plot(
-        range(len(interictal_means)),
-        interictal_means,
-        label="Interictal - Alpha Mean",
-        linestyle="-",
-        marker="o",
-    )
-    plt.plot(
-        range(len(preictal_means)),
-        preictal_means,
-        label="Preictal - Alpha Mean",
-        linestyle="-",
-        marker="x",
-    )
-
-    plt.xlabel("Slice Index")
-    plt.ylabel("Alpha Band Mean Log Amplitude")
-    plt.title("Alpha Band Features for Interictal and Preictal Segments")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
-
-# Plot the alpha band features
-plot_alpha_band_features(interictal_alpha_means, preictal_alpha_means)
-"""
+    return tensor, labels_tensor

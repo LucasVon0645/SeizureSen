@@ -9,7 +9,7 @@ from src.DataExtraction.DataExtractor import DataExtractor
 from src.Preprocessing.utils import (
     eeg_slices,
     save_preprocessed_data,
-    resample_bandpass_filter,
+    resample_and_apply_bandpass_filter,
 )
 from src.Preprocessing.Feature import Feature
 
@@ -45,7 +45,7 @@ test_segments = loaded_data["test"]
 train_segments_filtered = []
 for eeg_segment in tqdm(train_segments, desc="Filtering train segments"):
     train_segments_filtered.append(
-        resample_bandpass_filter(
+        resample_and_apply_bandpass_filter(
             eeg_segment, new_sampling_freq=SAMPLING_FREQ, time_length=SEGMENT_DURATION
         )
     )
@@ -54,7 +54,7 @@ train_segments = train_segments_filtered
 test_segments_filtered = []
 for eeg_segment in tqdm(test_segments, desc="Filtering test segments"):
     test_segments_filtered.append(
-        resample_bandpass_filter(
+        resample_and_apply_bandpass_filter(
             eeg_segment, new_sampling_freq=SAMPLING_FREQ, time_length=SEGMENT_DURATION
         )
     )
