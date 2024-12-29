@@ -4,19 +4,23 @@ from keras.layers import Dense, Dropout, Flatten, Input, concatenate, Conv2D
 from keras.optimizers import SGD
 from keras.regularizers import L2
 
-
 class MultiViewConvModel:
+    """
+    A class to build a multi-view convolutional neural network model
+    for EEG data analysis.
+    This model consists of two input branches, each processing
+    different features of the EEG data.
+    The first branch processes PCA-transformed data, while the
+    second branch processes FFT-transformed data.
+    The branches are then merged and passed through several dense layers
+    before producing the final output.
+    """
 
     @classmethod
-    def get_model(cls, config, channels, fft_bins, pca_bins, steps):
+    def get_model(cls, config: dict, channels: int, fft_bins: int, pca_bins: int, steps: int):
         """
         Builds and compiles a convolutional neural network model
         for EEG data analysis.
-        This model consists of two input branches, each processing
-        different features of the EEG data.
-        The first branch processes PCA-transformed data, while the
-        second branch processes FFT-transformed data.
-        The branches are then merged and passed through several
         dense layers before producing the final output.
         Args:
             config (dict): A dictionary containing various hyperparameters
@@ -25,11 +29,12 @@ class MultiViewConvModel:
             fft_bins (int): Number of FFT bins.
             pca_bins (int): Number of PCA bins.
             steps (int): Number of consecutive slices of EEG data to be
-                         analyzed by the neural network.
+                         analyzed by the neural network both in
+                         time and in frequency domain.
         Returns:
             model (tf.keras.Model): The compiled Keras model.
-            early_stopping (tf.keras.callbacks.EarlyStopping): EarlyStopping
-                                                               callback configured for the model.
+            early_stopping (tf.keras.callbacks.EarlyStopping): EarlyStopping callback configured
+            for the model.
         Model Inputs:
             - input1: PCA-transformed EEG data with shape (channels * pca_bins, steps, 1).
             - input2: FFT-transformed EEG data with shape (channels * fft_bins, steps, 1).
@@ -47,63 +52,64 @@ class MultiViewConvModel:
         """
 
         # Define first input branch for the time domain
-        # The last dimension of the input shape is 1 because the input data is single-channel (like grayscale image).
+        # The last dimension of the input shape is 1 because the input data
+        # is single-channel (like grayscale image).
         input1 = Input(shape=(channels * pca_bins, steps, 1), name="time_domain_input")
+        
         seq1 = Conv2D(
             filters=config["nb_filter"],
             kernel_size=(channels * pca_bins, 1),
             kernel_initializer="lecun_uniform",
             kernel_regularizer=L2(config["l2"]),
-            activation="relu",
-        )(input1)
+            activation="relu")(input1)
+        
         seq1 = Dropout(config["dropout"])(seq1)
-        early_exit1 = Dense(2, activation="sigmoid", name="early_exit1")(
-            Flatten()(seq1)
-        )
+        
+        early_exit1 = Dense(2, activation="sigmoid", name="early_exit1")(Flatten()(seq1))
 
         seq1 = Conv2D(
             filters=config["nb_filter"],
             kernel_size=(1, 3),
             kernel_regularizer=L2(config["l2"]),
             kernel_initializer="lecun_uniform",
-            activation="relu",
-        )(seq1)
+            activation="relu")(seq1)
+        
         seq1 = Dropout(config["dropout"])(seq1)
-        early_exit2 = Dense(2, activation="sigmoid", name="early_exit2")(
-            Flatten()(seq1)
-        )
+        
+        early_exit2 = Dense(2, activation="sigmoid", name="early_exit2")(Flatten()(seq1))
 
         seq1 = Flatten()(seq1)
+        
         output1 = Dense(config["nn_time_output"], activation="tanh")(seq1)
 
         # Define second input branch for the frequency domain
-        # The last dimension of the input shape is 1 because the input data is single-channel (like grayscale image).
+        # The last dimension of the input shape is 1 because the input data
+        # is single-channel (like grayscale image).
         input2 = Input(shape=(channels * fft_bins, steps, 1), name="freq_domain_input")
         seq2 = Conv2D(
             filters=config["nb_filter"],
             kernel_size=(channels * fft_bins, 1),
             kernel_regularizer=L2(config["l2"]),
             kernel_initializer="lecun_uniform",
-            activation="relu",
-        )(input2)
+            activation="relu")(input2)
+        
         seq2 = Dropout(config["dropout"])(seq2)
-        early_exit3 = Dense(2, activation="sigmoid", name="early_exit3")(
-            Flatten()(seq2)
-        )
+        
+        early_exit3 = Dense(2, activation="sigmoid", name="early_exit3")(Flatten()(seq2))
 
         seq2 = Conv2D(
             filters=config["nb_filter"],
             kernel_size=(1, 3),
             kernel_regularizer=L2(config["l2"]),
             kernel_initializer="lecun_uniform",
-            activation="relu",
-        )(seq2)
+            activation="relu")(seq2)
+        
         seq2 = Dropout(config["dropout"])(seq2)
-        early_exit4 = Dense(2, activation="sigmoid", name="early_exit4")(
-            Flatten()(seq2)
-        )
+        
+        early_exit4 = Dense(2, activation="sigmoid", name="early_exit4")(Flatten()(seq2))
 
         seq2 = Flatten()(seq2)
+        
         output2 = Dense(config["nn_freq_output"], activation="tanh")(seq2)
 
         # Merge both branches
@@ -122,8 +128,10 @@ class MultiViewConvModel:
         )
 
         # Choose optimizer based on the setting
-        sgd = SGD(learning_rate=config["lr"])
-        cnn_model.compile(loss="binary_crossentropy", optimizer=sgd, metrics=["accuracy"])
+        sgd = SGD(learning_rate=config["learning_rate"])
+        cnn_model.compile(
+            loss="binary_crossentropy", optimizer=sgd, metrics=["accuracy"]
+        )
 
         # Configure EarlyStopping callback
         early_stopping = EarlyStopping(
@@ -138,10 +146,24 @@ class MultiViewConvModel:
 
 
 if __name__ == "__main__":
-    
+    # Example configuration for the model
+    config_example = {
+        "nb_filter": 64,
+        "l2": 0.001,
+        "dropout": 0.2,
+        "learning_rate": 0.01,
+        "model_time_steps": 4,
+        "nn_time_output": 64,
+        "nn_freq_output": 64,
+        "batch_size": 128,
+        "nb_epoch": 100,
+        "name": "first_test",
+        "model_path": "models/first_test/first_test.h5",
+    }
+
     # Initialize the model
     model, _ = MultiViewConvModel.get_model(
-        setting=Setting(), channels=16, fft_bins=8, pca_bins=16, steps=4
+        config=config_example, channels=16, fft_bins=8, pca_bins=16, steps=4
     )
 
     # Display the model summary

@@ -2,8 +2,8 @@ import json
 import joblib
 import os
 import sys
-
 from pathlib import Path
+from tensorflow.keras.utils import to_categorical
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
@@ -116,11 +116,18 @@ class ModelTrainer:
         self.X_test_time, _ = transform_to_tensor(
             data_test_time["X"], data_test_time["y"], steps
         )
-
-    #! implement the train method
+    
+    #! implement the set_standard_scalar method
+    def set_standard_scalar(self):
+        pass
+    
+    #! implement the augment_train_data method
+    def augment_train_data(self):
+        pass
+    
     def train(self):
         self._validate_input(train=True)
-        
+
         X_fft = self.X_train_freq
         X_pca = self.X_train_time
         y_train = self.y_train
@@ -132,9 +139,15 @@ class ModelTrainer:
         pca_bins = X_pca.shape[2]
         steps = X_fft.shape[3]
 
+        # Reshape inputs for the model
         X_fft = X_fft.reshape(n_samples, channels * fft_bins, steps, 1)
         X_pca = X_pca.reshape(n_samples, channels * pca_bins, steps, 1)
 
+        # Convert the target labels to categorical if it's a classification task
+        # Assuming y_train contains integer labels (e.g., 0, 1, or 2 for 3 classes)
+        y_train = to_categorical(y_train, num_classes=2)  # Assuming binary classification (2 classes)
+
+        # Get the model and early stopping callback
         model, early_stopping = MultiViewConvModel.get_model(
             config=config,
             channels=channels,
@@ -143,6 +156,7 @@ class ModelTrainer:
             steps=steps,
         )
 
+        # Train the model
         model.fit(
             {"time_domain_input": X_pca, "freq_domain_input": X_fft},
             {"final_output": y_train},
@@ -150,6 +164,7 @@ class ModelTrainer:
             verbose=1,
             batch_size=config["batch_size"],
             shuffle=True,
+            callbacks=[early_stopping],  # Add early stopping
         )
 
         #! finish the training process
@@ -230,6 +245,7 @@ class ModelTrainer:
                 raise ValueError(
                     "Number of time steps in X_fft_test, X_pca_test must be equal."
                 )
+
 
 
 if __name__ == "__main__":
