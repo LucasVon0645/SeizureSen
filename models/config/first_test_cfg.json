@@ -1,0 +1,13 @@
+{
+    "nb_filter": 64,
+    "l2": 0.001,
+    "dropout": 0.2,
+    "learning_rate": 0.01,
+    "model_time_steps": 4,
+    "nn_time_output": 64,
+	"nn_freq_output": 64,
+    "batch_size": 128,
+    "nb_epoch": 100,
+	"name": "first_test",
+    "model_path": "models/first_test/first_test.h5"
+}
