@@ -1,7 +1,10 @@
-import numpy as np
 import os
-import tensorflow as tf
+
+import numpy as np
 import scipy.signal
+
+import tensorflow as tf
+
 
 def eeg_slices(eeg_data, sampling_freq, window_duration):
     """
@@ -186,9 +189,7 @@ def resample(eeg_segment, new_sampling_freq, time_length=600):
     return scipy.signal.resample(eeg_segment, new_sampling_freq * time_length, axis=1)
 
 
-def butterworth_bandpass_filter(
-    eeg_segment=np.ndarray, order=int, band=None, sampling_freq=400
-):
+def butterworth_bandpass_filter(eeg_segment=np.ndarray, order=int, band=None, sampling_freq=400):
     """
     Applies a Butterworth bandpass filter to an EEG signal segment.
 
@@ -218,9 +219,7 @@ def butterworth_bandpass_filter(
     return scipy.signal.lfilter(b, a, eeg_segment, axis=1)
 
 
-def resample_and_apply_bandpass_filter(
-    eeg_segment, order=5, band=None, new_sampling_freq=400, time_length=600
-):
+def resample_and_apply_bandpass_filter(eeg_segment, order=5, band=None, new_sampling_freq=400, time_length=600):
     """
     Resamples the given EEG data to a new sampling rate and applies a Butterworth bandpass filter.
 
@@ -252,9 +251,7 @@ def resample_and_apply_bandpass_filter(
     return filtered_data, label
 
 
-def transform_to_tensor(
-    features: list[dict], labels: list[int], steps: int
-) -> tuple[tf.Tensor, tf.Tensor]:
+def transform_to_tensor(features: list[dict], labels: list[int], steps: int) -> tuple[tf.Tensor, tf.Tensor]:
     """
     Transform a list of dictionaries into a 4D tensor and group labels.
 
@@ -321,3 +318,47 @@ def transform_to_tensor(
     labels_tensor = tf.convert_to_tensor(labels_tensor, dtype=tf.int32)
 
     return tensor, labels_tensor
+
+
+def scale_across_time_tf(data: tf.Tensor, scalers: list[dict]) -> tf.Tensor:
+    """
+    Scales data across time using precomputed scalers.
+    Parameters:
+        - data: Input data tensor. Shape (samples, channels, bins, time_steps).
+        - scalers: A list of dictionaries containing 'mean' and 'std' for each channel.
+    Returns:
+        - scaled_data: The scaled data as a TensorFlow tensor.
+    """
+    sample_num, channel_num, bin_num, time_step_num = data.shape
+
+    # Validate scalers
+    if len(scalers) != channel_num:
+        raise ValueError("The number of scalers must match the number of channels.")
+
+    # Scale each channel independently
+    scaled_data = tf.TensorArray(tf.float32, size=channel_num)
+
+    for i in range(channel_num):
+        # Extract scalers for this channel
+        mean = scalers[i]['mean']
+        std = scalers[i]['std']
+
+        # Reshape and scale the data for this channel
+        channel_data = tf.reshape(
+            tf.transpose(data[:, i, :, :], perm=[0, 2, 1]),
+            [sample_num * time_step_num, bin_num]
+        )
+        scaled_channel_data = (channel_data - mean) / std
+        scaled_channel_data = tf.transpose(
+            tf.reshape(scaled_channel_data, [sample_num, time_step_num, bin_num]),
+            perm=[0, 2, 1]
+        )
+
+        # Add scaled data back to TensorArray
+        scaled_data = scaled_data.write(i, scaled_channel_data)
+
+    # Stack all channels back into the tensor
+    # The original dimension for channel is axis=1, so we stack along axis=1
+    scaled_data = tf.stack(scaled_data.stack(), axis=1)
+
+    return scaled_data

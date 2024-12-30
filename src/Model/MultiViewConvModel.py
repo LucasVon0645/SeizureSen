@@ -1,8 +1,8 @@
-from keras.callbacks import EarlyStopping
-from keras.models import Model
-from keras.layers import Dense, Dropout, Flatten, Input, concatenate, Conv2D
-from keras.optimizers import SGD
-from keras.regularizers import L2
+from keras.api.callbacks import EarlyStopping
+from keras.api.models import Model
+from keras.api.layers import Dense, Dropout, Flatten, Input, concatenate, Conv2D
+from keras.api.optimizers import SGD
+from keras.api.regularizers import L2
 
 class MultiViewConvModel:
     """
@@ -19,9 +19,7 @@ class MultiViewConvModel:
     @classmethod
     def get_model(cls, config: dict, channels: int, fft_bins: int, pca_bins: int, steps: int):
         """
-        Builds and compiles a convolutional neural network model
-        for EEG data analysis.
-        dense layers before producing the final output.
+        Builds and compiles a convolutional neural network model for EEG data analysis.
         Args:
             config (dict): A dictionary containing various hyperparameters
                               and settings for the model.
@@ -55,16 +53,16 @@ class MultiViewConvModel:
         # The last dimension of the input shape is 1 because the input data
         # is single-channel (like grayscale image).
         input1 = Input(shape=(channels * pca_bins, steps, 1), name="time_domain_input")
-        
+
         seq1 = Conv2D(
             filters=config["nb_filter"],
             kernel_size=(channels * pca_bins, 1),
             kernel_initializer="lecun_uniform",
             kernel_regularizer=L2(config["l2"]),
             activation="relu")(input1)
-        
+
         seq1 = Dropout(config["dropout"])(seq1)
-        
+
         early_exit1 = Dense(2, activation="sigmoid", name="early_exit1")(Flatten()(seq1))
 
         seq1 = Conv2D(
@@ -73,13 +71,13 @@ class MultiViewConvModel:
             kernel_regularizer=L2(config["l2"]),
             kernel_initializer="lecun_uniform",
             activation="relu")(seq1)
-        
+
         seq1 = Dropout(config["dropout"])(seq1)
-        
+
         early_exit2 = Dense(2, activation="sigmoid", name="early_exit2")(Flatten()(seq1))
 
         seq1 = Flatten()(seq1)
-        
+
         output1 = Dense(config["nn_time_output"], activation="tanh")(seq1)
 
         # Define second input branch for the frequency domain
@@ -92,9 +90,9 @@ class MultiViewConvModel:
             kernel_regularizer=L2(config["l2"]),
             kernel_initializer="lecun_uniform",
             activation="relu")(input2)
-        
+
         seq2 = Dropout(config["dropout"])(seq2)
-        
+
         early_exit3 = Dense(2, activation="sigmoid", name="early_exit3")(Flatten()(seq2))
 
         seq2 = Conv2D(
@@ -103,13 +101,13 @@ class MultiViewConvModel:
             kernel_regularizer=L2(config["l2"]),
             kernel_initializer="lecun_uniform",
             activation="relu")(seq2)
-        
+
         seq2 = Dropout(config["dropout"])(seq2)
-        
+
         early_exit4 = Dense(2, activation="sigmoid", name="early_exit4")(Flatten()(seq2))
 
         seq2 = Flatten()(seq2)
-        
+
         output2 = Dense(config["nn_freq_output"], activation="tanh")(seq2)
 
         # Merge both branches
@@ -124,13 +122,14 @@ class MultiViewConvModel:
         # Define the model
         cnn_model = Model(
             inputs=[input1, input2],
-            outputs=[output, early_exit1, early_exit2, early_exit3, early_exit4],
+            # outputs=[output, early_exit1, early_exit2, early_exit3, early_exit4],
+            outputs=[output],
         )
 
         # Choose optimizer based on the setting
         sgd = SGD(learning_rate=config["learning_rate"])
         cnn_model.compile(
-            loss="binary_crossentropy", optimizer=sgd, metrics=["accuracy"]
+            loss="binary_crossentropy", optimizer=sgd, metrics=["accuracy", "precision", "recall"]
         )
 
         # Configure EarlyStopping callback
@@ -158,7 +157,7 @@ if __name__ == "__main__":
         "batch_size": 128,
         "nb_epoch": 100,
         "name": "first_test",
-        "model_path": "models/first_test/first_test.h5",
+        "model_path": "models/first_test/first_test.keras",
     }
 
     # Initialize the model
