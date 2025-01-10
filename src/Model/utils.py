@@ -1,34 +1,40 @@
 import os
+import sys
 import joblib
 import json
-from keras.api.models import load_model, Model
+from keras.api.models import Model
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+
+from src.Model.MultiViewConvModel import MultiViewConvModel
+
 
 def load_model_from_config(config: dict) -> Model:
     """
-    Loads a pre-trained model from the specified file path in the configuration.
-
-    This method uses the keras library to load the model from the file path
-    provided in the configuration dictionary under the key "model_path" and
-    "name". The loaded model is then assigned to the instance variable `self.model`.
-    File format: ".keras"
-    Parameters:
-        config (dict): A dictionary containing the configuration settings
-                       for the model.
+    Load a pre-trained model from a configuration dictionary.
+    Args:
+        config (dict): A dictionary containing configuration parameters.
+                       It must include the key "model_path" which specifies
+                       the directory where the model checkpoint is stored.
+    Returns:
+        Model: The loaded model with weights restored from the checkpoint.
     Raises:
-        FileNotFoundError: If the specified model file does not exist.
-        Exception: If there is an error during the loading of the model.
+        KeyError: If the "model_path" key is not found in the config dictionary.
+        OSError: If there is an issue loading the model weights from the specified filepath.
     """
+
     model_path = config["model_path"]
-    model_name = config["name"]
-    filename = model_name + ".keras"
+    filename = "best_model.keras"
+    filepath = os.path.join(model_path, "checkpoint", filename)
 
-    filepath = os.path.join(model_path, filename)
+    model, _ = MultiViewConvModel.get_model(config)
 
-    model = load_model(filepath, compile=True)
+    model.load_weights(filepath)
 
     print("\n\nModel loaded successfully from ", filepath)
 
     return model
+
 
 def load_scalers_from_config(config: dict) -> tuple[list[dict], list[dict]]:
     """
@@ -47,7 +53,7 @@ def load_scalers_from_config(config: dict) -> tuple[list[dict], list[dict]]:
     """
 
     model_path = config["model_path"]
-    filename = config["name"] + "_scalers.pkl"
+    filename = "feature_scalers.pkl"
 
     filepath = os.path.join(model_path, filename)
 
@@ -55,10 +61,11 @@ def load_scalers_from_config(config: dict) -> tuple[list[dict], list[dict]]:
     scalers = joblib.load(filepath)
 
     # Access the time domain and frequency domain scalers
-    scalers_time = scalers['time_domain_scalers']
-    scalers_freq = scalers['frequency_domain_scalers']
+    scalers_time = scalers["time_domain"]
+    scalers_freq = scalers["frequency_domain"]
 
     return scalers_time, scalers_freq
+
 
 def load_config(config_path) -> dict | None:
     """
@@ -71,13 +78,16 @@ def load_config(config_path) -> dict | None:
         "l2": float,
         "dropout": float,
         "learning_rate": float,
-        "model_time_steps": int,
         "nn_time_output": int,
         "nn_freq_output": int,
         "batch_size": int,
         "nb_epoch": int,
         "name": "first_test",
-        "model_path": str
+        "model_path": str,
+        "model_time_steps": int,
+        "channels": int,
+        "fft_bins": int,
+        "pca_bins": int
     }
     Obs.: model_path is the relative path from the project root.
     It is used to save/load the trained model, as well the scalers.
@@ -88,5 +98,6 @@ def load_config(config_path) -> dict | None:
     config = None
     with open(config_path, "r", encoding="utf-8") as file:
         config = json.load(file)
-        
+
     return config
+

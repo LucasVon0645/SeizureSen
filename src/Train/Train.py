@@ -24,6 +24,4 @@ print("X_test_time: ", trainer.X_test_time.shape)
 print("y_test: ", trainer.y_test.shape)
 
 trainer.train()
-trainer.save_scalers()
-trainer.evaluate() # ! Implement this method
-trainer.save_model()
+trainer.evaluate()

@@ -1,14 +1,36 @@
 import os
-
+import sys
 import joblib
-import tensorflow as tf
-from keras.api.utils import to_categorical
-from keras.api.models import Model
+import pandas as pd
+import matplotlib
 
-from src.Train.utils import plot_training_history
-from src.Preprocessing.utils import load_preprocessed_data, transform_to_tensor
+from sklearn.metrics import classification_report
+from sklearn.model_selection import train_test_split
+
+import tensorflow as tf
+from keras.api.utils import to_categorical, plot_model
+from keras.api.models import Model
+from keras.api.callbacks import ModelCheckpoint
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+
+from src.Train.utils import (
+    plot_training_history,
+    save_confusion_matrix,
+    save_model_scores,
+)
+from src.Preprocessing.utils import (
+    load_preprocessed_data,
+    transform_to_tensor,
+    scale_across_time_tf,
+)
 from src.Model.MultiViewConvModel import MultiViewConvModel
-from src.Model.utils import load_model_from_config, load_config, load_scalers_from_config
+from src.Model.utils import (
+    load_model_from_config,
+    load_config,
+    load_scalers_from_config,
+)
+
 
 class ModelTrainer:
     """
@@ -26,25 +48,33 @@ class ModelTrainer:
 
         self.config = load_config(cfg_path)
 
-        self.model: Model|None = None
+        self.model: Model | None = None
 
         # Freq Domain Tensorflow Tensors (n_samples, n_channels, fft_bins, steps)
-        self.X_train_freq: tf.Tensor|None = None
-        self.X_test_freq: tf.Tensor|None = None
+        self.X_train_freq: tf.Tensor | None = None
+        self.X_test_freq: tf.Tensor | None = None
 
         # Time Domain Tensorflow Tensors (n_samples, n_channels, pca_bins, steps)
-        self.X_train_time: tf.Tensor|None = None
-        self.X_test_time: tf.Tensor|None = None
+        self.X_train_time: tf.Tensor | None = None
+        self.X_test_time: tf.Tensor | None = None
 
         # Label Tensors (n_samples,)
-        self.y_train: tf.Tensor|None = None
-        self.y_test: tf.Tensor|None = None
+        self.y_train: tf.Tensor | None = None
+        self.y_test: tf.Tensor | None = None
 
-        # Scalers for both time and frequency domain 
+        # Scalers for both time and frequency domain
         # Lists of dictionaries {"mean": float, "std": float}
         # One dictionary per channel
-        self.scalers_time: list[dict]|None = None
-        self.scalers_freq: list[dict]|None = None
+        self.scalers_time: list[dict] | None = None
+        self.scalers_freq: list[dict] | None = None
+
+        matplotlib.use(
+            "Agg"
+        )  # Use the Agg backend to avoid displaying plots during execution
+
+        model_path = self.config["model_path"]
+
+        os.makedirs(model_path, exist_ok=True)
 
     def load_data(self, file_names_dict=dict | None):
         """
@@ -78,10 +108,14 @@ class ModelTrainer:
 
         # Load preprocessed slices of eeg data for train and evaluation
 
-        data_train_freq = load_preprocessed_data(data_dir, file_names_dict["freq_train"])
+        data_train_freq = load_preprocessed_data(
+            data_dir, file_names_dict["freq_train"]
+        )
         data_test_freq = load_preprocessed_data(data_dir, file_names_dict["freq_test"])
 
-        data_train_time = load_preprocessed_data(data_dir, file_names_dict["time_train"])
+        data_train_time = load_preprocessed_data(
+            data_dir, file_names_dict["time_train"]
+        )
         data_test_time = load_preprocessed_data(data_dir, file_names_dict["time_test"])
 
         steps = self.config["model_time_steps"]
@@ -104,7 +138,7 @@ class ModelTrainer:
         self.X_test_time, _ = transform_to_tensor(
             data_test_time["X"], data_test_time["y"], steps
         )
-       
+
     def load_scalers(self):
         """
         Loads the time and frequency scalers from the configuration.
@@ -113,17 +147,17 @@ class ModelTrainer:
         Returns:
             None
         """
-        
+
         self.scalers_time, self.scalers_freq = load_scalers_from_config(self.config)
 
-    def compute_scalers_transform(self, time_domain = True):
+    def compute_scalers_transform(self, time_domain=True):
         """
         Compute the mean and standard deviation for each channel and standardize the data.
         Parameters:
             - time_domain: If True, compute the scalers for the time domain data.
                            If False, compute the scalers for the frequency domain data.
 
-        Obs.: The scalers are stored in the instance variables `self.scalers_time` and 
+        Obs.: The scalers are stored in the instance variables `self.scalers_time` and
         `self.scalers_freq` as a list of dictionaries, where each dictionary contains
         the mean and standard deviation for a channel.
         """
@@ -145,7 +179,7 @@ class ModelTrainer:
             # Extract the data for the current channel and reshape for scaling
             channel_data = tf.reshape(
                 tf.transpose(data[:, i, :, :], perm=[0, 2, 1]),
-                [sample_num * time_step_num, bin_num]
+                [sample_num * time_step_num, bin_num],
             )
 
             # Compute the mean and standard deviation for the channel
@@ -156,12 +190,14 @@ class ModelTrainer:
             standardized_channel_data = (channel_data - mean) / std
 
             # Store the mean and std for this channel (optional, if you need to use them later)
-            scalers.append({'mean': mean, 'std': std})
+            scalers.append({"mean": mean, "std": std})
 
             # Reshape and transpose the standardized data back to the original dimensions
             standardized_channel_data = tf.transpose(
-                tf.reshape(standardized_channel_data, [sample_num, time_step_num, bin_num]),
-                perm=[0, 2, 1]
+                tf.reshape(
+                    standardized_channel_data, [sample_num, time_step_num, bin_num]
+                ),
+                perm=[0, 2, 1],
             )
 
             # Add the standardized data to the TensorArray
@@ -184,13 +220,13 @@ class ModelTrainer:
         """
 
         model_path = self.config["model_path"]
-        filename = self.config["name"] + "_scalers.pkl"
+        filename = "feature_scalers.pkl"
 
         filepath = os.path.join(model_path, filename)
 
         scalers = {
             "time_domain": self.scalers_time,
-            "frequency_domain": self.scalers_freq
+            "frequency_domain": self.scalers_freq,
         }
 
         # Save the dictionary to a file using joblib
@@ -200,8 +236,16 @@ class ModelTrainer:
     def augment_train_data(self):
         pass
 
-    #! check the train method and fix the validation issue
     def train(self):
+        """
+        Train the multi-view convolutional neural network model.
+        This method trains and validates the model using the training data.
+        All hyperparameters, the number of epochs and the batch size are specified
+        in the configuration settings.
+        The best model is saved to a file using the ModelCheckpoint callback in a directory
+        "checkpoint" within the model directory specified in the configuration.
+        """
+
         print("\n\nTraining the model...")
 
         self._validate_input(train=True)
@@ -210,17 +254,21 @@ class ModelTrainer:
 
         # Compute the scalers for the time domain and scale
         self.compute_scalers_transform(time_domain=True)
-        # perform the same for the frequency domain data
+        # Perform the same for the frequency domain data
         self.compute_scalers_transform(time_domain=False)
 
         print("\n\nTrain data scaling completed")
-        
-        if self.X_train_freq is None or self.X_train_time is None or self.y_train is None:
+
+        if (
+            self.X_train_freq is None
+            or self.X_train_time is None
+            or self.y_train is None
+        ):
             raise ValueError("Training data is missing!")
 
         X_fft = self.X_train_freq
         X_pca = self.X_train_time
-        y_train = self.y_train
+        y = self.y_train
         config = self.config
 
         n_samples = X_fft.shape[0]
@@ -230,89 +278,162 @@ class ModelTrainer:
         steps = X_fft.shape[3]
 
         # Reshape inputs for the model
+        # The last dimension of the input shape is 1 because the input data
+        # is single-channel (like grayscale image)
         X_fft = tf.reshape(X_fft, [n_samples, channels * fft_bins, steps, 1])
         X_pca = tf.reshape(X_pca, [n_samples, channels * pca_bins, steps, 1])
 
-        # Convert the target labels to categorical if it's a classification task
-        # Assuming y_train contains integer labels (e.g., 0, 1, or 2 for 3 classes)
-        y_train = to_categorical(y_train, num_classes=2)  # Assuming binary classification (2 classes)
-
-        # Get the model and early stopping callback
-        model, early_stopping = MultiViewConvModel.get_model(
-            config=config,
-            channels=channels,
-            fft_bins=fft_bins,
-            pca_bins=pca_bins,
-            steps=steps,
+        # Split the data into training and validation sets
+        X_fft_train, X_fft_val, X_pca_train, X_pca_val, y_train, y_val = (
+            train_test_split(
+                X_fft.numpy(),
+                X_pca.numpy(),
+                y.numpy(),
+                test_size=0.2,
+                random_state=42,
+                stratify=y,
+                shuffle=True,
+            )
         )
-        
-        self.model = model
 
+        # Print the class distribution for the training
+        train_dist = (
+            pd.Series(y_train).map({0: "interictal", 1: "preictal"}).value_counts()
+        )
+        print("\n\nTraining data class distribution:")
+        print(train_dist)
+        # Print the class distribution for the validation
+        val_dist = pd.Series(y_val).map({0: "interictal", 1: "preictal"}).value_counts()
+        print("\n\nValidation data class distribution:")
+        print(val_dist, "\n\n")
+
+        # Convert the target labels to categorical, as it's a classification task
+        # The labels are one-hot encoded (e.g., [0, 1] for preictal and [1, 0] for interictal)
+        y_train = to_categorical(y_train, num_classes=2)
+        y_val = to_categorical(y_val, num_classes=2)
+
+        # Add model checkpoint callback to automatically save the best model
+        model_path = self.config["model_path"]
+        checkpoint_path = os.path.join(model_path, "checkpoint", "best_model.keras")
+        os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+        checkpoint = ModelCheckpoint(
+            checkpoint_path, monitor="val_loss", save_best_only=True, verbose=1
+        )
+
+        # Create non-trained model object and get the early stopping callback
+        multi_view_conv_model, early_stopping = MultiViewConvModel.get_model(config)
+
+        self.model = multi_view_conv_model
+
+        print("Fitting the model...")
         # Train the model
-        history = model.fit(
-            {"time_domain_input": X_pca, "freq_domain_input": X_fft},
-            {"final_output": y_train},
+        history = multi_view_conv_model.fit(
+            {"time_domain_input": X_pca_train, "freq_domain_input": X_fft_train}, y_train,
+            validation_data=(
+                {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val},
+                {"final_output": y_val},
+            ),
             epochs=config["nb_epoch"],
             verbose=1,
             batch_size=config["batch_size"],
-            shuffle=True,
-            callbacks=[early_stopping],  # Add early stopping
-            validation_split = 0.2
+            callbacks=[
+                early_stopping,
+                checkpoint,
+            ],  # Add early stopping and checkpoint callbacks
         )
 
         print("\n\nTraining completed!")
 
-        print("\nTrain Loss: ", history.history["loss"])
-        print("Train Accuracy: ",history.history["accuracy"])
-        print("\nValidation Loss: ",history.history["val_loss"])
-        print("Validation Accuracy: ",history.history["val_accuracy"])
-        print("Validation Precision: ",history.history["val_precision"])
-        print("Validation Recall: ",history.history["val_recall"])
-        
-        plot_training_history(history, self.config["model_path"])
+        # Save the scalers to a file
+        self.save_scalers()
 
-    #! implement the evaluate method
+        print("\nTrain Loss over epochs: ", history.history["loss"])
+        print("Train Accuracy over epochs: ", history.history["accuracy"])
+
+        print("\n\nModel Validation")
+
+        print("\nValidation Loss over epochs: ", history.history["val_loss"])
+        print("Validation Accuracy overs epochs: ", history.history["val_accuracy"])
+        print("")
+
+        # Get model predictions for validation data
+        y_pred = multi_view_conv_model.predict({"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val})
+
+        # Get the classification report for the validation data and save it
+        self._get_classification_report(y_val, y_pred, suffix="val")
+
+        # Save the training history
+        plot_training_history(history, config["model_path"])
+
+        # Uncomment the two following lines only if you have graphviz installed!
+        # filepath = os.path.join(config["model_path"], config["name"] + "_architecture.png")
+        # plot_model(multi_view_conv_model, to_file=filepath, show_shapes=True, show_layer_names=True, show_layer_activations=True)
+
     def evaluate(self):
+        """
+        Evaluate the multi-view convolutional neural network model.
+        This method evaluates the model using the test data.
+        The model is loaded from the configuration settings, and the test data
+        is scaled using the scalers learned from the training data.
+        The classification report is generated for the test data.
+        """
+
         self._validate_input(train=False)
 
-    def save_model(self):
-        """
-        Saves the trained model to the specified file path.
+        # Scale the test data using the scalers learned from the training data
+        scale_across_time_tf(self.X_test_time, self.scalers_time)
+        scale_across_time_tf(self.X_test_freq, self.scalers_freq)
 
-        The file path is retrieved from the configuration dictionary (`self.config["model_path"]`).
-        The model is serialized and saved using the `keras` library.
-        File format: ".keras"
+        print("\n\nEvaluating the model...")
 
-        Raises:
-            KeyError: If "model_path" is not found in the configuration dictionary.
-            Exception: If there is an error during the model saving process.
-        """
-        
-        model_path = self.config["model_path"]
-        model_name = self.config["name"]
-        filename = model_name + ".keras"
+        if self.X_test_freq is None or self.X_test_time is None or self.y_test is None:
+            raise ValueError("Testing data is missing!")
 
-        filepath = os.path.join(model_path, filename)
+        # Get the test data
+        X_fft = self.X_test_freq
+        X_pca = self.X_test_time
+        y = self.y_test
 
-        self.model.save(filepath)
-        
-        print(f"\n\nModel saved to {filepath}")
+        # Get the model
+        multi_view_conv_model = self.model
+
+        n_samples = X_fft.shape[0]
+        channels = X_fft.shape[1]
+        fft_bins = X_fft.shape[2]
+        pca_bins = X_pca.shape[2]
+        steps = X_fft.shape[3]
+
+        # Reshape inputs for the model
+        # The last dimension of the input shape is 1 because the input data
+        # is single-channel (like grayscale image)
+        X_fft = tf.reshape(X_fft, [n_samples, channels * fft_bins, steps, 1])
+        X_pca = tf.reshape(X_pca, [n_samples, channels * pca_bins, steps, 1])
+
+        # Convert the target labels to categorical
+        y_test = to_categorical(y, num_classes=2).numpy()
+
+        # Evaluate the model
+        y_pred = multi_view_conv_model.predict(
+            {"time_domain_input": X_pca, "freq_domain_input": X_fft}
+        )
+
+        # Get the classification report for the test data and save it
+        self._get_classification_report(y_test, y_pred, suffix="eval")
+
+        print("\nEvaluation completed!")
 
     def load_model(self):
         """
-        Loads a pre-trained model from the specified file path in the configuration.
-
-        This method uses the keras library to load the model from the file path
-        provided in the configuration dictionary under the key "model_path" and
-        "name". The loaded model is then assigned to the instance variable `self.model`.
-        File format: ".keras"
-
-        Raises:
-            FileNotFoundError: If the specified model file does not exist.
-            Exception: If there is an error during the loading of the model.
+        Loads the machine learning model based on the provided configuration.
+        This method initializes the model by loading it from the configuration
+        specified in `self.config`. Additionally, it loads the necessary scalers
+        required for preprocessing the data.
+        Returns:
+            None
         """
 
         self.model = load_model_from_config(self.config)
+        self.load_scalers()
 
     def _validate_input(self, train=True):
         """
@@ -325,12 +446,40 @@ class ModelTrainer:
                     If the number of samples in X_test_fft, X_test_pca, and y_test are not equal (when train=False).
                     If the number of time steps in X_test_fft and X_test_pca are not equal (when train=False).
         """
+        config = self.config
         if train:
             X_train_fft = self.X_train_freq
             X_train_pca = self.X_train_time
             y_train = self.y_train
 
-            if X_train_fft.shape[0] != X_train_pca.shape[0] or X_train_fft.shape[0] != y_train.shape[0]:
+            if (
+                X_train_fft.shape[1] != config["channels"]
+                or X_train_pca.shape[1] != config["channels"]
+            ):
+                raise ValueError(
+                    "Number of channels in X_train_fft and X_train_pca must match the configuration."
+                )
+
+            if (
+                X_train_fft.shape[3] != config["model_time_steps"]
+                or X_train_pca.shape[3] != config["model_time_steps"]
+            ):
+                raise ValueError(
+                    "Number of time steps in X_train_fft and X_train_pca must match the configuration."
+                )
+
+            if (
+                X_train_fft.shape[2] != config["fft_bins"]
+                or X_train_pca.shape[2] != config["pca_bins"]
+            ):
+                raise ValueError(
+                    "Number of FFT bins in X_train_fft and PCA bins in X_train_pca must match the configuration."
+                )
+
+            if (
+                X_train_fft.shape[0] != X_train_pca.shape[0]
+                or X_train_fft.shape[0] != y_train.shape[0]
+            ):
                 raise ValueError(
                     "Number of samples in X_train_fft, X_train_pca, and y_train must be equal."
                 )
@@ -344,7 +493,34 @@ class ModelTrainer:
             X_test_pca = self.X_test_time
             y_test = self.y_test
 
-            if X_test_fft.shape[0] != X_test_pca.shape[0] or X_test_fft.shape[0] != y_test.shape[0]:
+            if (
+                X_test_fft.shape[1] != config["channels"]
+                or X_test_pca.shape[1] != config["channels"]
+            ):
+                raise ValueError(
+                    "Number of channels in X_test_fft and X_test_pca must match the configuration."
+                )
+
+            if (
+                X_test_fft.shape[3] != config["model_time_steps"]
+                or X_test_pca.shape[3] != config["model_time_steps"]
+            ):
+                raise ValueError(
+                    "Number of time steps in X_test_fft and X_test_pca must match the configuration."
+                )
+
+            if (
+                X_test_fft.shape[2] != config["fft_bins"]
+                or X_test_pca.shape[2] != config["pca_bins"]
+            ):
+                raise ValueError(
+                    "Number of FFT bins in X_test_fft and PCA bins in X_test_pca must match the configuration."
+                )
+
+            if (
+                X_test_fft.shape[0] != X_test_pca.shape[0]
+                or X_test_fft.shape[0] != y_test.shape[0]
+            ):
                 raise ValueError(
                     "Number of samples in X_test_fft, X_test_pca, and y_test must be equal."
                 )
@@ -352,3 +528,39 @@ class ModelTrainer:
                 raise ValueError(
                     "Number of time steps in X_test_fft, X_test_pca must be equal."
                 )
+
+    def _get_classification_report(self, y_true, y_pred, suffix=""):
+        """
+        Get the classification report for the model.
+        The plot is saved in the model directory.
+        Parameters:
+            y_true (np.ndarray): The true labels in categorical format (matrix like).
+            y_pred (np.ndarray): The predicted labels in categorical format (matrix like).
+            suffix (str): The suffix to add to the file name.
+        """
+
+        # Binarize predictions (e.g., threshold = 0.5 for binary classification)
+        y_pred_classes = (y_pred[:, 1] > 0.5).astype(int)
+        y_true_classes = y_true[:, 1].astype(int)
+
+        report = classification_report(
+            y_true_classes,
+            y_pred_classes,
+            target_names=["Interictal", "Preictal"],
+            zero_division=0,
+        )
+
+        print("\n\nClassification Report")
+        print(report)
+
+        model_path = self.config["model_path"]
+
+        filename = f"classification_report_{suffix}.txt"
+        save_model_scores(report, os.path.join(model_path, filename))
+
+        filename = f"confusion_matrix_{suffix}.png"
+        save_confusion_matrix(
+            y_true_classes,
+            y_pred_classes,
+            os.path.join(model_path, filename),
+        )
