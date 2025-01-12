@@ -3,7 +3,7 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from src.Train.ModelTrainer import ModelTrainer
+from src.Train.ModelTrainer_newnetwork import ModelTrainer
 
 config_path = os.path.join("models", "config", "first_test_cfg.json")
 data_path = os.path.join("data", "preprocessed", "Dog_1")
