@@ -1,0 +1,16 @@
+{
+    "nb_filter": 64,
+    "l2": 0.001,
+    "dropout": 0.2,
+    "learning_rate": 0.01,
+    "model_time_steps": 20,
+    "channels": 16,
+    "fft_bins": 9,
+    "pca_bins": 16,
+    "nn_time_output": 64,
+	"nn_freq_output": 64,
+    "batch_size": 64,
+    "nb_epoch": 10,
+	"name": "std_time_test",
+    "model_path": "models\\std_time_test_cfg"
+}

@@ -1,0 +1,94 @@
+Preprocessing EEG data...
+Loaded 3935 test labels from c:\Users\User\Documents\Python Projects\SeizureSen\data\TestLabels.csv
+Loaded data for 1 dog(s)
+  - Interictal segments: 480
+  - Preictal segments: 24
+  - Test segments: 502
+Metadata:  {'sampling_frequency': np.float64(399.609756097561), 'channels': [array(['NVC1202_32_002_Ecog_c001'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c002'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c003'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c004'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c005'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c006'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c007'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c008'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c009'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c010'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c011'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c012'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c013'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c014'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c015'], dtype='<U24'), array(['NVC1202_32_002_Ecog_c016'], dtype='<U24')]}
+Filtering train segments: 100%|█████████████████████████████████████████████████████████████████████████████████████████| 504/504 [03:41<00:00,  2.27it/s]
+Filtering test segments: 100%|██████████████████████████████████████████████████████████████████████████████████████████| 502/502 [05:36<00:00,  1.49it/s]
+Slicing train segments: 100%|██████████████████████████████████████████████████████████████████████████████████████████| 504/504 [00:01<00:00, 349.11it/s]
+Slicing test segments: 100%|██████████████████████████████████████████████████████████████████████████████████████████| 502/502 [00:00<00:00, 4639.68it/s]
+Number of slices for training: 10080
+Number of slices for testing: 10040
+Preprocessing Training Dataset in Time Domain:
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10080/10080 [06:34<00:00, 25.57it/s] 
+Shape of X_time_train: (10080,)
+Shape of y_time_train: (10080,)
+Saving preprocessed training data in time domain...
+Data saved to data\preprocessed\Dog_1\time_domain_train_v2.npz
+Preprocessing Training Dataset in Frequency Domain:
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10080/10080 [01:13<00:00, 136.94it/s] 
+Shape of X_freq_train: (10080,)
+Number of slices for testing: 10040
+Preprocessing Training Dataset in Time Domain:
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10080/10080 [06:34<00:00, 25.57it/s] 
+Shape of X_time_train: (10080,)
+Shape of y_time_train: (10080,)
+Saving preprocessed training data in time domain...
+Data saved to data\preprocessed\Dog_1\time_domain_train_v2.npz
+Preprocessing Training Dataset in Frequency Domain:
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10080/10080 [01:13<00:00, 136.94it/s] 
+Shape of X_freq_train: (10080,)
+Preprocessing Training Dataset in Time Domain:
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10080/10080 [06:34<00:00, 25.57it/s] 
+Shape of X_time_train: (10080,)
+Shape of y_time_train: (10080,)
+Saving preprocessed training data in time domain...
+Data saved to data\preprocessed\Dog_1\time_domain_train_v2.npz
+Preprocessing Training Dataset in Frequency Domain:
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10080/10080 [01:13<00:00, 136.94it/s] 
+Shape of X_freq_train: (10080,)
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10080/10080 [06:34<00:00, 25.57it/s] 
+Shape of X_time_train: (10080,)
+Shape of y_time_train: (10080,)
+Saving preprocessed training data in time domain...
+Data saved to data\preprocessed\Dog_1\time_domain_train_v2.npz
+Preprocessing Training Dataset in Frequency Domain:
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10080/10080 [01:13<00:00, 136.94it/s] 
+Shape of X_freq_train: (10080,)
+Shape of X_time_train: (10080,)
+Shape of y_time_train: (10080,)
+Saving preprocessed training data in time domain...
+Data saved to data\preprocessed\Dog_1\time_domain_train_v2.npz
+Preprocessing Training Dataset in Frequency Domain:
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10080/10080 [01:13<00:00, 136.94it/s] 
+Shape of X_freq_train: (10080,)
+Saving preprocessed training data in time domain...
+Data saved to data\preprocessed\Dog_1\time_domain_train_v2.npz
+Preprocessing Training Dataset in Frequency Domain:
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10080/10080 [01:13<00:00, 136.94it/s] 
+Shape of X_freq_train: (10080,)
+Preprocessing Training Dataset in Frequency Domain:
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10080/10080 [01:13<00:00, 136.94it/s] 
+Shape of X_freq_train: (10080,)
+Shape of y_freq_train: (10080,)
+Saving preprocessed training data in frequency domain...
+Data saved to data\preprocessed\Dog_1\freq_domain_train_v2.npz
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10080/10080 [01:13<00:00, 136.94it/s] 
+Shape of X_freq_train: (10080,)
+Shape of y_freq_train: (10080,)
+Saving preprocessed training data in frequency domain...
+Data saved to data\preprocessed\Dog_1\freq_domain_train_v2.npz
+Preprocessing Test Dataset in Time Domain:
+Shape of y_freq_train: (10080,)
+Saving preprocessed training data in frequency domain...
+Data saved to data\preprocessed\Dog_1\freq_domain_train_v2.npz
+Preprocessing Test Dataset in Time Domain:
+Data saved to data\preprocessed\Dog_1\freq_domain_train_v2.npz
+Preprocessing Test Dataset in Time Domain:
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10040/10040 [06:55<00:00, 24.18it/s] 
+Preprocessing Test Dataset in Time Domain:
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10040/10040 [06:55<00:00, 24.18it/s] 
+100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10040/10040 [06:55<00:00, 24.18it/s] 
+Shape of X_time_test: (10040,)
+Shape of y_time_test: (10040,)
+Saving preprocessed test data in time domain...
+Data saved to data\preprocessed\Dog_1\time_domain_test_v2.npz
+Preprocessing Test Dataset in Frequency Domain:
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10040/10040 [00:59<00:00, 167.89it/s] 
+Shape of X_freq_test: (10040,)
+Shape of y_freq_test: (10040,)
+Saving preprocessed test data in frequency domain...
+Data saved to data\preprocessed\Dog_1\freq_domain_test_v2.npz
+Preprocessing completed.

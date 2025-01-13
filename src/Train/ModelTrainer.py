@@ -76,7 +76,7 @@ class ModelTrainer:
 
         os.makedirs(model_path, exist_ok=True)
 
-    def load_data(self, file_names_dict=dict | None):
+    def load_data(self, file_names_dict: dict | None = None):
         """
         Load and preprocess EEG data for training and evaluation.
         This function loads preprocessed EEG data from specified files,
@@ -98,7 +98,7 @@ class ModelTrainer:
         print("\n\nLoading preprocessed EEG data...")
         data_dir = self.data_path
 
-        if file_names_dict is not None:
+        if file_names_dict is None:
             file_names_dict = {
                 "freq_train": "freq_domain_train.npz",
                 "freq_test": "freq_domain_test.npz",
@@ -366,8 +366,8 @@ class ModelTrainer:
         plot_training_history(history, config["model_path"])
 
         # Uncomment the two following lines only if you have graphviz installed!
-        # filepath = os.path.join(config["model_path"], config["name"] + "_architecture.png")
-        # plot_model(multi_view_conv_model, to_file=filepath, show_shapes=True, show_layer_names=True, show_layer_activations=True)
+        filepath = os.path.join(config["model_path"], config["name"] + "_architecture.png")
+        plot_model(multi_view_conv_model, to_file=filepath, show_shapes=True, show_layer_names=True, show_layer_activations=True)
 
     def evaluate(self):
         """

@@ -140,21 +140,18 @@ def divide_into_frequency_chunks(eeg_data, sampling_freq):
     return frequency_band_data
 
 
-def calculate_band_features(frequency_band_data):
+def calculate_band_features(frequency_band_data, use_std_in_time_domain=False, eeg_slice=None):
     """
-    Calculate band features for given frequency band data.
-    This function computes the mean log amplitude and standard deviation of the log amplitude
-    for each frequency band and each channel. The results are returned in a dictionary.
+    Calculate band features for each frequency band.
     Parameters:
-    frequency_band_data (dict): A dictionary where keys are band names (str) and values are
-                                numpy arrays of shape (channels, samples) representing the
-                                frequency band data for each channel.
+    frequency_band_data (dict): A dictionary containing EEG data in different frequency bands.
+    use_std_in_time_domain (bool, optional): Whether to include the standard deviation of the EEG slice in the time domain.
+    eeg_slice (numpy.ndarray, optional): The EEG slice to calculate the standard deviation in the time domain.
     Returns:
-    dict: A dictionary containing the mean log amplitude and standard deviation of the log
-          amplitude for each band. The keys are in the format '{band_name}_mean' and
-          '{band_name}_std', and the values are numpy arrays of shape (channels,).
+    dict: A dictionary containing band features for each band. The keys are in the format "<band_name>_<feature_name>".
+          The values are arrays containing the feature values for each channel.
     """
-
+    
     band_features = (
         {}
     )  # Band features are the mean log amplitude and standard deviation.
@@ -169,7 +166,19 @@ def calculate_band_features(frequency_band_data):
         )  # Standard deviation for each channel
 
         band_features[f"{band_name}_mean"] = mean_log_amplitude
-        band_features[f"{band_name}_std"] = std_log_amplitude
+        if not use_std_in_time_domain:
+            band_features[f"{band_name}_std"] = std_log_amplitude
+
+    if use_std_in_time_domain:
+        if eeg_slice is None:
+            raise ValueError(
+                "eeg_slice must be provided to calculate the standard deviation in the time domain."
+                )
+        
+        # Calculate the standard deviation of the EEG slice in the time domain
+        # for each channel and add it to the band features
+        std_time_domain = np.std(eeg_slice, axis=1)
+        band_features["time_domain_std"] = std_time_domain
 
     return band_features
 

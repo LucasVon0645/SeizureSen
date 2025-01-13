@@ -21,6 +21,17 @@ print("Preprocessing EEG data...")
 
 DIR_RAW_DATA = "data"
 TEST_LABELS_FILE = "TestLabels.csv"
+SAMPLING_FREQ = 400  # New sampling frequency of EEG data in Hz
+DIR_PREPROCESSED_DATA = "data/preprocessed/Dog_1"
+SEGMENT_DURATION = 600  # Length of each segment in seconds (10 minutes)
+WINDOW_DURATION = 30  # Duration of each slice in seconds
+USE_STD_IN_TIME_DOMAIN = True
+OUTPUT_FILES_NAME = {
+                    "freq_train": "freq_domain_train_v2.npz",
+                    "freq_test": "freq_domain_test_v2.npz",
+                    "time_train": "time_domain_train_v2.npz",
+                    "time_test": "time_domain_test_v2.npz",
+                    }
 
 data_extractor = DataExtractor(
     data_directory=DIR_RAW_DATA, test_labels_file=TEST_LABELS_FILE
@@ -32,11 +43,6 @@ loaded_data = data_extractor.get_data()
 
 metadata = data_extractor.get_metadata()
 print("Metadata: ", metadata)
-
-SAMPLING_FREQ = 400  # New sampling frequency of EEG data in Hz
-DIR_PREPROCESSED_DATA = "data/preprocessed/Dog_1"
-SEGMENT_DURATION = 600  # Length of each segment in seconds (10 minutes)
-WINDOW_DURATION = 30  # Duration of each slice in seconds
 
 train_segments = loaded_data["preictal"] + loaded_data["interictal"]
 test_segments = loaded_data["test"]
@@ -100,7 +106,7 @@ print("Shape of y_time_train:", y_time_train.shape)
 print("Saving preprocessed training data in time domain...")
 save_preprocessed_data(
     directory="data/preprocessed/Dog_1",
-    filename="time_domain_train.npz",
+    filename=OUTPUT_FILES_NAME["time_train"],
     X=X_time_train,
     y=y_time_train,
 )
@@ -111,7 +117,7 @@ X_freq_train = []  # To store features for all slices
 y_freq_train = []  # To store labels for all slices
 
 for eeg_slice, label in tqdm(train_slices_with_label):
-    eeg_preprocessed = feature_preprocessor.freq_domain(eeg_slice)
+    eeg_preprocessed = feature_preprocessor.freq_domain(eeg_slice, use_std_in_time_domain=USE_STD_IN_TIME_DOMAIN)
     X_freq_train.append(eeg_preprocessed)
     y_freq_train.append(label)
 
@@ -124,7 +130,7 @@ print("Shape of y_freq_train:", y_freq_train.shape)
 print("Saving preprocessed training data in frequency domain...")
 save_preprocessed_data(
     directory="data/preprocessed/Dog_1",
-    filename="freq_domain_train.npz",
+    filename=OUTPUT_FILES_NAME["freq_train"],
     X=X_freq_train,
     y=y_freq_train,
 )
@@ -148,7 +154,7 @@ print("Shape of y_time_test:", y_time_test.shape)
 print("Saving preprocessed test data in time domain...")
 save_preprocessed_data(
     directory="data/preprocessed/Dog_1",
-    filename="time_domain_test.npz",
+    filename=OUTPUT_FILES_NAME["time_test"],
     X=X_time_test,
     y=y_time_test,
 )
@@ -159,7 +165,7 @@ X_freq_test = []  # To store features for all slices
 y_freq_test = []  # To store labels for all slices
 
 for eeg_slice, label in tqdm(test_slices_with_label):
-    eeg_preprocessed = feature_preprocessor.freq_domain(eeg_slice)
+    eeg_preprocessed = feature_preprocessor.freq_domain(eeg_slice, use_std_in_time_domain=USE_STD_IN_TIME_DOMAIN)
     X_freq_test.append(eeg_preprocessed)
     y_freq_test.append(label)
 
@@ -172,7 +178,7 @@ print("Shape of y_freq_test:", y_freq_test.shape)
 print("Saving preprocessed test data in frequency domain...")
 save_preprocessed_data(
     directory="data/preprocessed/Dog_1",
-    filename="freq_domain_test.npz",
+    filename=OUTPUT_FILES_NAME["freq_test"],
     X=X_freq_test,
     y=y_freq_test,
 )
