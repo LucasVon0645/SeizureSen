@@ -54,7 +54,7 @@ class Feature:
 
         return pca_dict
 
-    def freq_domain(self, eeg_slice):
+    def freq_domain(self, eeg_slice, use_std_in_time_domain=False):
         """
         Extracts frequency domain features from an EEG slice.
         This method divides the given EEG slice into frequency bands and calculates
@@ -74,8 +74,12 @@ class Feature:
         frequency_band_data = divide_into_frequency_chunks(
             eeg_slice, self.sampling_freq
         )
-
-        # Calculate mean log amplitude and standard deviation
-        band_features = calculate_band_features(frequency_band_data)
-
-        return band_features
+        
+        if use_std_in_time_domain:
+            # Calculate mean log amplitude and standard deviation
+            band_features = calculate_band_features(frequency_band_data, use_std_in_time_domain, eeg_slice)
+            return band_features
+        else:
+            # Calculate mean log amplitude and standard deviation
+            band_features = calculate_band_features(frequency_band_data)
+            return band_features
