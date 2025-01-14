@@ -405,14 +405,14 @@ class ModelTrainer:
                 batch_size=config["batch_size"],
                 callbacks=[early_stopping, checkpoint],
             )
-            
+
         print("\n\nTraining completed!")
 
         # Save the scalers to a file
         self.save_scalers()
 
         print("\nTrain Loss over epochs: ", history.history["loss"])
-        
+
         if use_early_exits:
             print(
                 "\nValidation Accuracy for 'final_output' over epochs: ",

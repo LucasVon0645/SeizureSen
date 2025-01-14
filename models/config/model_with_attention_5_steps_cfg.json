@@ -3,7 +3,7 @@
     "l2": 0.001,
     "dropout": 0.2,
     "learning_rate": 0.01,
-    "model_time_steps": 20,
+    "model_time_steps": 5,
     "channels": 16,
     "fft_bins": 16,
     "pca_bins": 16,
@@ -11,6 +11,6 @@
 	"nn_freq_output": 64,
     "batch_size": 64,
     "nb_epoch": 10,
-	"name": "first_test",
-    "model_path": "models\\first_test"
+	"name": "model_with_attention_5_steps",
+    "model_path": "models\\model_with_attention_5_steps"
 }

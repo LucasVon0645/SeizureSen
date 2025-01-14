@@ -11,6 +11,6 @@
 	"nn_freq_output": 64,
     "batch_size": 64,
     "nb_epoch": 10,
-	"name": "attention_test",
-    "model_path": "models\\attention_test"
+	"name": "model_without_attention",
+    "model_path": "models\\model_without_attention"
 }

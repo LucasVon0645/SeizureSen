@@ -5,12 +5,12 @@
     "learning_rate": 0.01,
     "model_time_steps": 20,
     "channels": 16,
-    "fft_bins": 9,
+    "fft_bins": 16,
     "pca_bins": 16,
     "nn_time_output": 64,
 	"nn_freq_output": 64,
     "batch_size": 64,
     "nb_epoch": 10,
-	"name": "attention_test_std_time",
-    "model_path": "models\\attention_test_std_time"
+	"name": "model_with_attention",
+    "model_path": "models\\model_with_attention"
 }

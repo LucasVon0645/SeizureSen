@@ -7,10 +7,10 @@ from src.Train.ModelTrainer import ModelTrainer
 from src.Model.MultiViewConvModel import MultiViewConvModel
 from src.Model.MultiViewConvModelAttention import MultiViewConvModelWithAttention
 
-config_path = os.path.join("models", "config", "first_test_cfg.json")
+config_path = os.path.join("models", "config", "model_without_attention_cfg.json")
 data_path = os.path.join("data", "preprocessed", "Dog_1")
 
-trainer = ModelTrainer(cfg_path=config_path, data_directory=data_path, model_class=MultiViewConvModelWithAttention)
+trainer = ModelTrainer(cfg_path=config_path, data_directory=data_path, model_class=MultiViewConvModel)
 
 preprocessed_filenames = {
     "freq_train": "freq_domain_train.npz",
@@ -33,5 +33,5 @@ print("X_test_freq: ", trainer.X_test_freq.shape)
 print("X_test_time: ", trainer.X_test_time.shape)
 print("y_test: ", trainer.y_test.shape)
 
-trainer.train(use_early_exits=True)
-trainer.evaluate(use_early_exits=True)
+trainer.train(use_early_exits=False)
+trainer.evaluate(use_early_exits=False)
