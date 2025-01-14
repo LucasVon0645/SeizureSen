@@ -3,7 +3,7 @@ from keras.api.models import Model
 from keras.api.layers import Dense, Dropout, Flatten, Input, concatenate, Conv2D
 from keras.api.optimizers import SGD
 from keras.api.regularizers import L2
-from keras.layers import GlobalAveragePooling2D, GlobalMaxPooling2D, Reshape, multiply, add, Activation
+from keras.api.layers import GlobalAveragePooling2D, GlobalMaxPooling2D, Reshape, multiply, add, Activation
 
 
 def channel_attention(input_feature, ratio=8):

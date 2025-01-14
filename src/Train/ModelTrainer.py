@@ -24,7 +24,7 @@ from src.Preprocessing.utils import (
     transform_to_tensor,
     scale_across_time_tf,
 )
-from src.Model.MultiViewConvModel import MultiViewConvModel
+
 from src.Model.utils import (
     load_model_from_config,
     load_config,
@@ -42,13 +42,14 @@ class ModelTrainer:
     are saved to a specified file path.
     """
 
-    def __init__(self, cfg_path: str, data_directory: str):
+    def __init__(self, cfg_path: str, data_directory: str, model_class: type):
         self.data_path = data_directory
         self.config_path = cfg_path
 
         self.config = load_config(cfg_path)
 
         self.model: Model | None = None
+        self.model_class = model_class  # Store the model class for later use
 
         # Freq Domain Tensorflow Tensors (n_samples, n_channels, fft_bins, steps)
         self.X_train_freq: tf.Tensor | None = None
@@ -236,7 +237,7 @@ class ModelTrainer:
     def augment_train_data(self):
         pass
 
-    def train(self):
+    def train(self, use_early_exits=False):
         """
         Train the multi-view convolutional neural network model.
         This method trains and validates the model using the training data.
@@ -312,6 +313,9 @@ class ModelTrainer:
         y_train = to_categorical(y_train, num_classes=2)
         y_val = to_categorical(y_val, num_classes=2)
 
+        y_train = y_train.astype("float32")
+        y_val = y_val.astype("float32")
+
         # Add model checkpoint callback to automatically save the best model
         model_path = self.config["model_path"]
         checkpoint_path = os.path.join(model_path, "checkpoint", "best_model.keras")
@@ -321,55 +325,144 @@ class ModelTrainer:
         )
 
         # Create non-trained model object and get the early stopping callback
-        multi_view_conv_model, early_stopping = MultiViewConvModel.get_model(config)
+        multi_view_conv_model, early_stopping = self.model_class.get_model(config)
 
         self.model = multi_view_conv_model
 
         print("Fitting the model...")
-        # Train the model
-        history = multi_view_conv_model.fit(
-            {"time_domain_input": X_pca_train, "freq_domain_input": X_fft_train}, y_train,
-            validation_data=(
-                {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val},
-                {"final_output": y_val},
-            ),
-            epochs=config["nb_epoch"],
-            verbose=1,
-            batch_size=config["batch_size"],
-            callbacks=[
-                early_stopping,
-                checkpoint,
-            ],  # Add early stopping and checkpoint callbacks
-        )
+        print("Final output shape:", multi_view_conv_model.output[0].shape)
 
+        if not use_early_exits:
+            # Train the model
+            history = multi_view_conv_model.fit(
+                {"time_domain_input": X_pca_train, "freq_domain_input": X_fft_train},
+                y_train,
+                validation_data=(
+                    {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val},
+                    {"final_output": y_val},
+                ),
+                epochs=config["nb_epoch"],
+                verbose=1,
+                batch_size=config["batch_size"],
+                callbacks=[
+                    early_stopping,
+                    checkpoint,
+                ],  # Add early stopping and checkpoint callbacks
+            )
+
+        else:
+            multi_view_conv_model.compile(
+                optimizer="adam",
+                loss={
+                    "final_output": "categorical_crossentropy",
+                    "early_exit1": "categorical_crossentropy",
+                    "early_exit2": "categorical_crossentropy",
+                    "early_exit3": "categorical_crossentropy",
+                    "early_exit4": "categorical_crossentropy",
+                },
+                # Weights for the losses of the different outputs
+                loss_weights={
+                    "final_output": 1.0,
+                    "early_exit1": 0.5,
+                    "early_exit2": 0.7,
+                    "early_exit3": 0.8,
+                    "early_exit4": 1.0,
+                },
+                metrics={
+                    "final_output": ["accuracy"],
+                    "early_exit1": ["accuracy"],
+                    "early_exit2": ["accuracy"],
+                    "early_exit3": ["accuracy"],
+                    "early_exit4": ["accuracy"],
+                },
+            )
+            
+            print("Early exits shape:", [output.shape for output in multi_view_conv_model.outputs[1:]])
+
+            history = multi_view_conv_model.fit(
+                {"time_domain_input": X_pca_train, "freq_domain_input": X_fft_train},
+                {
+                    "final_output": y_train,
+                    "early_exit1": y_train,
+                    "early_exit2": y_train,
+                    "early_exit3": y_train,
+                    "early_exit4": y_train,
+                },
+                validation_data=(
+                    {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val},
+                    {
+                        "final_output": y_val,
+                        "early_exit1": y_val,
+                        "early_exit2": y_val,
+                        "early_exit3": y_val,
+                        "early_exit4": y_val,
+                    },
+                ),
+                epochs=config["nb_epoch"],
+                batch_size=config["batch_size"],
+                callbacks=[early_stopping, checkpoint],
+            )
+            
         print("\n\nTraining completed!")
 
         # Save the scalers to a file
         self.save_scalers()
 
         print("\nTrain Loss over epochs: ", history.history["loss"])
-        print("Train Accuracy over epochs: ", history.history["accuracy"])
+        
+        if use_early_exits:
+            print(
+                "\nValidation Accuracy for 'final_output' over epochs: ",
+                history.history["val_final_output_accuracy"],
+            )
+            print(
+                "Validation Accuracy for 'early_exit1' over epochs: ",
+                history.history["val_early_exit1_accuracy"],
+            )
+            print(
+                "Validation Accuracy for 'early_exit2' over epochs: ",
+                history.history["val_early_exit2_accuracy"],
+            )
+            print(
+                "Validation Accuracy for 'early_exit3' over epochs: ",
+                history.history["val_early_exit3_accuracy"],
+            )
+            print(
+                "Validation Accuracy for 'early_exit4' over epochs: ",
+                history.history["val_early_exit4_accuracy"],
+            )
+        else:
+            print("Train Accuracy over epochs: ", history.history["accuracy"])
 
         print("\n\nModel Validation")
 
         print("\nValidation Loss over epochs: ", history.history["val_loss"])
-        print("Validation Accuracy overs epochs: ", history.history["val_accuracy"])
+        
         print("")
 
-        # Get model predictions for validation data
-        y_pred = multi_view_conv_model.predict({"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val})
+        y_pred = multi_view_conv_model.predict(
+            {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val}
+        )
 
         # Get the classification report for the validation data and save it
-        self._get_classification_report(y_val, y_pred, suffix="val")
+        self._get_classification_report(y_val, y_pred, use_early_exits, suffix="val")
 
         # Save the training history
         plot_training_history(history, config["model_path"])
 
         # Uncomment the two following lines only if you have graphviz installed!
-        filepath = os.path.join(config["model_path"], config["name"] + "_architecture.png")
-        plot_model(multi_view_conv_model, to_file=filepath, show_shapes=True, show_layer_names=True, show_layer_activations=True)
+        filepath = os.path.join(
+            config["model_path"], config["name"] + "_architecture.png"
+        )
+        plot_model(
+            multi_view_conv_model,
+            to_file=filepath,
+            show_shapes=True,
+            show_layer_names=True,
+            show_layer_activations=True,
+        )
 
-    def evaluate(self):
+    def evaluate(self, use_early_exits=False):
         """
         Evaluate the multi-view convolutional neural network model.
         This method evaluates the model using the test data.
@@ -418,7 +511,7 @@ class ModelTrainer:
         )
 
         # Get the classification report for the test data and save it
-        self._get_classification_report(y_test, y_pred, suffix="eval")
+        self._get_classification_report(y_test, y_pred, use_early_exits, suffix="eval")
 
         print("\nEvaluation completed!")
 
@@ -529,7 +622,9 @@ class ModelTrainer:
                     "Number of time steps in X_test_fft, X_test_pca must be equal."
                 )
 
-    def _get_classification_report(self, y_true, y_pred, suffix=""):
+    def _get_classification_report(
+        self, y_true, y_pred, early_exits_used=False, suffix=""
+    ):
         """
         Get the classification report for the model.
         The plot is saved in the model directory.
@@ -538,9 +633,15 @@ class ModelTrainer:
             y_pred (np.ndarray): The predicted labels in categorical format (matrix like).
             suffix (str): The suffix to add to the file name.
         """
-
         # Binarize predictions (e.g., threshold = 0.5 for binary classification)
-        y_pred_classes = (y_pred[:, 1] > 0.5).astype(int)
+        if early_exits_used:
+            # Only the final_output is considered for the classification report
+            y_pred_final = y_pred[0]
+            y_pred_classes = (y_pred_final[:, 1] > 0.5).astype(int)
+        else:
+            y_pred_classes = (y_pred[:, 1] > 0.5).astype(int)
+
+        # Binarize true labels (e.g., threshold = 0.5 for binary classification)
         y_true_classes = y_true[:, 1].astype(int)
 
         report = classification_report(
@@ -559,7 +660,7 @@ class ModelTrainer:
         save_model_scores(report, os.path.join(model_path, filename))
 
         filename = f"confusion_matrix_{suffix}.png"
-        save_confusion_matrix(
+        save_confusion_matrix( 
             y_true_classes,
             y_pred_classes,
             os.path.join(model_path, filename),

@@ -34,6 +34,8 @@ from src.Model.utils import (
     load_scalers_from_config,
 )
 
+from typing import Optional
+
 
 class ModelTrainer:
     """
@@ -50,8 +52,6 @@ class ModelTrainer:
         self.config_path = cfg_path
 
         self.config = load_config(cfg_path)
-
-        from typing import Optional
 
         self.model: Optional[Model] = None
 
@@ -70,8 +70,8 @@ class ModelTrainer:
         # Scalers for both time and frequency domain
         # Lists of dictionaries {"mean": float, "std": float}
         # One dictionary per channel
-        self.scalers_time: Optional[list[dict]] = None
-        self.scalers_freq: Optional[list[dict]] = None
+        self.scalers_time: Optional[List[Dict]] = None
+        self.scalers_freq: Optional[List[Dict]] = None
 
         matplotlib.use(
             "Agg"
