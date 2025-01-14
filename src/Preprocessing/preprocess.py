@@ -25,12 +25,12 @@ SAMPLING_FREQ = 400  # New sampling frequency of EEG data in Hz
 DIR_PREPROCESSED_DATA = "data/preprocessed/Dog_1"
 SEGMENT_DURATION = 600  # Length of each segment in seconds (10 minutes)
 WINDOW_DURATION = 30  # Duration of each slice in seconds
-USE_STD_IN_TIME_DOMAIN = True
+USE_STD_IN_TIME_DOMAIN = False
 OUTPUT_FILES_NAME = {
-                    "freq_train": "freq_domain_train_v2.npz",
-                    "freq_test": "freq_domain_test_v2.npz",
-                    "time_train": "time_domain_train_v2.npz",
-                    "time_test": "time_domain_test_v2.npz",
+                    "freq_train": "freq_domain_train.npz",
+                    "freq_test": "freq_domain_test.npz",
+                    "time_train": "time_domain_train.npz",
+                    "time_test": "time_domain_test.npz",
                     }
 
 data_extractor = DataExtractor(
