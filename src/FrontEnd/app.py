@@ -1,48 +1,20 @@
+import os
 import streamlit as st
 import numpy as np
 from PIL import Image
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import os
-import time
 
 from src.FrontEnd.utils.utils import (
+    display_eeg_classes,
     display_metadata_in_expander,
-    extract_eeg_from_specific_file,
+    load_and_prefilter_eeg,
+    load_css,
+    simulate_streaming
 )
+from src.SeizureSenPredictor.SeizureSenPredictor import SeizureSenPredictor
 
-
-def simulate_streaming(data, chunk_size, update_period):
-    """
-    Simulates real-time streaming of data in chunks.
-
-    This function takes a 2D array of data and yields consecutive chunks along the
-    second axis to simulate a streaming process. Each chunk is delayed by the specified
-    `update_period` to mimic real-time behavior.
-
-    Args:
-        data (np.ndarray): The input data, typically a 2D array where rows represent
-                           signals (e.g., channels) and columns represent time points.
-        chunk_size (int): The number of time points to include in each chunk.
-        update_period (float): The time interval (in seconds) between yielding consecutive chunks.
-
-    Yields:
-        np.ndarray: A chunk of the data with shape (n_channels, chunk_size), where
-                    `n_channels` is the number of rows in `data` and `chunk_size` is
-                    the specified number of columns.
-    """
-    for i in range(0, data.shape[1], chunk_size):
-        chunk = data[:, i : i + chunk_size]
-        yield chunk
-        time.sleep(update_period)
-
-# Load CSS from external file
-def load_css():
-    with open("src/FrontEnd/style.css", "r") as file:
-        css = file.read()
-    return css
-
-def app():
+def app(seizure_sen_predictor: SeizureSenPredictor):
     """
     Frontend web application for seizure prediction in dogs.
 
@@ -62,14 +34,10 @@ def app():
         installed and that the backend model is properly configured for predictions
         (data and pretrained model files are available).
     """
-    st.set_page_config(
-        page_title="EEG Seizure Prediction", page_icon=":dog:", layout="wide"
-    )
-
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     dog_image_path = os.path.join(script_dir, "images/logo.png")
-    
+
     # Inject custom CSS from the external file
     st.markdown(f"<style>{load_css()}</style>", unsafe_allow_html=True)
 
@@ -106,27 +74,24 @@ def app():
     if uploaded_file:
         st.sidebar.success("File uploaded successfully!")
         try:
-            data = extract_eeg_from_specific_file(uploaded_file)
-            eeg_data = data["eeg_data"]
-            metadata = data["metadata"]
+            sampling_freq = 400
+            eeg_data, metadata, labels = load_and_prefilter_eeg(uploaded_file, sampling_freq)
             
-            type_eeg = metadata["type"]
+            eeg_type = metadata["type"]
 
             display_metadata_in_expander(metadata)
+            if eeg_type == "test":
+                display_eeg_classes(labels)
 
-            simulation_speed = st.sidebar.slider("Simulation Speed", 10, 100, 50)
-
-            update_period = st.sidebar.slider(
-                "Update Period (in seconds)", 0.1, 1.0, 0.5
-            )
-
-            sampling_freq = data["metadata"]["sampling_frequency"]
-            total_duration = data["metadata"]["duration"]
-
-            chunk_size = round(sampling_freq * update_period * simulation_speed)
-
-            chunk_period = chunk_size / sampling_freq
-
+            sampling_freq = metadata["sampling_frequency"]
+            
+            chunk_period = 30  # 30-second chunks
+            chunk_size = sampling_freq * chunk_period  # number of samples in 30-second chunks
+            
+            total_chunks = int(
+                        eeg_data.shape[1] / chunk_size
+                    )  # Calculate total number of chunks
+            
             selected_channels = st.sidebar.multiselect(
                 "Select Channels to Plot",
                 options=metadata["channels"],
@@ -141,39 +106,45 @@ def app():
             elif len(selected_channels) > 4:
                 st.sidebar.error("You can select up to 4 channels only.")
             else:
-                simulation_duration = total_duration / simulation_speed
-
+                update_period = st.sidebar.slider(
+                    "Update Period (in seconds)", 0.1, 1.0, 0.5
+                )
                 window_duration = st.sidebar.slider(
-                    "Window Duration (seconds)", 10, 100, 60
+                    "Window Duration (simulation seconds)", 10, 100, 60
                 )
                 window_size = int(window_duration * sampling_freq)
-
+            
                 st.sidebar.write(
-                    f"Simulation duration: {simulation_duration:.2f} seconds"
+                    f"Time slice: {chunk_period:.2f} simulation seconds"
                 )
+                
+                simulation_duration = total_chunks * update_period
                 st.sidebar.write(
-                    f"New added segment duration: {chunk_period:.2f} seconds"
+                    f"Simulation duration in real world: {simulation_duration:.2f} seconds"
                 )
 
                 placeholder = st.empty()
-                
 
                 if st.sidebar.button("Generate", key="Generate"):
                     # Initialize an empty array to store cumulative data
                     cumulative_data = np.empty((eeg_data.shape[0], 0))
-                    total_chunks = int(
-                        eeg_data.shape[1] / chunk_size
-                    )  # Calculate total number of chunk
                     chunk_index = (
                         0  # index used to allow the visualization of the progress bar
                     )
                     progress_bar = st.sidebar.progress(
                         0, text="Simulation Progress"
                     )  # Initialize progress bar
+                    
+                    # Initialize time chunks list and prediction history
+                    time_chunks_list = [] # List to store time chunks that will be used at the same time to make a prediction
+                    pred_history = [] # List to store prediction history
+                    time_steps_model = seizure_sen_predictor.get_model_time_steps()
 
                     for chunk in simulate_streaming(
                         eeg_data, chunk_size, update_period
                     ):
+                        time_chunks_list.append(chunk)
+                        
                         # Concatenate new chunk to cumulative data along the second axis
                         cumulative_data = np.concatenate(
                             (cumulative_data, chunk), axis=1
@@ -181,7 +152,8 @@ def app():
                         cumulative_time_values = (
                             np.arange(cumulative_data.shape[1]) / sampling_freq
                         )
-
+                            
+                        
                         data_to_plot = cumulative_data[:, -window_size:]
                         time_values_to_plot = cumulative_time_values[-window_size:]
 
@@ -198,6 +170,20 @@ def app():
                             subplot_titles=[f"Channel {metadata['channels'][idx]}" for idx in selected_indices]
                             
                         )
+                        
+                        # Check if we have enough time chunks to make a prediction
+                        if len(time_chunks_list) == time_steps_model:
+                            prediction_window = time_steps_model * 30
+                            pred, prob = seizure_sen_predictor.classify_eeg(time_chunks_list)
+                            pred_history.append(pred)
+                            st.write(pred_history)
+                            st.write(f"Last Prediction made on the last {prediction_window} seconds: {pred} segment detected with probability {prob:.2f}")
+                            if pred == "preictal":
+                                st.error("A seizure will likely happen!", icon="🚨")
+                            else:
+                                st.warning("No seizure predicted so far", icon="😌")
+                            
+                            time_chunks_list = [] # Reset time chunks list
 
                         with placeholder.container():
                             # Update progress bar
@@ -246,11 +232,6 @@ def app():
                             chunk_index += 1  # Update chunk index for visualization bar
 
                     st.success("Simulation completed!")
-                    
-                    if type_eeg == "preictal":
-                        st.error("A seizure will likely happen!", icon="🚨")
-                    else:
-                        st.warning("No seizure predicted", icon="😌")
                         
 
         except Exception as e:

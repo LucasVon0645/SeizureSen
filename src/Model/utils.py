@@ -5,18 +5,15 @@ import json
 from typing import Optional
 from keras.api.models import Model
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from src.Model.MultiViewConvModel import MultiViewConvModel
-
-
-def load_model_from_config(config: dict) -> Model:
+def load_model_from_config(config: dict, model_class: type) -> Model:
     """
     Load a pre-trained model from a configuration dictionary.
     Args:
         config (dict): A dictionary containing configuration parameters.
                        It must include the key "model_path" which specifies
                        the directory where the model checkpoint is stored.
+        model_class (type): The class of the model to be loaded.
     Returns:
         Model: The loaded model with weights restored from the checkpoint.
     Raises:
@@ -28,7 +25,7 @@ def load_model_from_config(config: dict) -> Model:
     filename = "best_model.keras"
     filepath = os.path.join(model_path, "checkpoint", filename)
 
-    model, _ = MultiViewConvModel.get_model(config)
+    model, _ = model_class.get_model(config)
 
     model.load_weights(filepath)
 
@@ -43,6 +40,10 @@ def load_scalers_from_config(config: dict) -> tuple[list[dict], list[dict]]:
     This function reads a configuration dictionary to determine the path and filename
     of a pickle file containing the scalers. It then loads the scalers from the file
     and returns the time domain and frequency domain scalers.
+    
+    The scalers consist of a list of dictionaries, where each dictionary contains the
+    the mean and standard deviation of the feature 
+    
     Args:
         config (dict): A dictionary containing the configuration. It must have the keys:
             - "model_path" (str): The path to the directory containing the scaler file.

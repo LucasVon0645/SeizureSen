@@ -288,7 +288,7 @@ def transform_to_tensor(features: list[dict], labels: list[int], steps: int) -> 
     feature_keys = features[0].keys()
     n_channels = len(features[0][list(feature_keys)[0]])  # Number of channels
 
-    # Flatten the features into a list of features for each slice
+    # Convert the list of dict into a list of tensors. All features are put together in a tensor
     all_slices = []
     for slice_dict in features:
         slice_features = tf.convert_to_tensor(
@@ -328,13 +328,76 @@ def transform_to_tensor(features: list[dict], labels: list[int], steps: int) -> 
 
     return tensor, labels_tensor
 
+def transform_features_to_tensor(features: list[dict], steps: int) -> tf.Tensor:
+    """
+    Transform a list of dictionaries into a 4D tensor and group labels.
+
+    Parameters:
+        features: list of dictionaries
+            Each dictionary contains keys (features) mapping to arrays (channels).
+        steps: int
+            Number of slices to aggregate into one sample slot.
+
+    Returns:
+        tensor: 4D keras tensor (n_samples, n_channels, features, steps)
+
+    Raises:
+        ValueError: If the total number of slices is not divisible by the number of
+        steps or if labels within a group are not the same.
+    """
+
+    # Extract keys (features)
+    feature_keys = features[0].keys()
+    n_channels = len(features[0][list(feature_keys)[0]])  # Number of channels
+
+    # Convert the list of dict into a list of tensors. All features are put together in a tensor
+    all_slices = []
+    for slice_dict in features:
+        slice_features = tf.convert_to_tensor(
+            [slice_dict[key] for key in feature_keys], dtype=tf.float32
+        )  # Shape: (features, n_channels)
+        all_slices.append(
+            tf.transpose(slice_features)
+        )  # Transpose to (n_channels, features)
+
+    # Stack all slices into a 3D tensor (total_slices, n_channels, features)
+    all_slices = tf.stack(all_slices)  # Shape: (total_slices, n_channels, features)
+
+    # Ensure the total number of slices is divisible by steps
+    total_slices = all_slices.shape[0]
+    if total_slices % steps != 0:
+        raise ValueError(
+            "The total number of slices must be divisible by the number of steps."
+        )
+
+    # Stack all slices into a 3D tensor (total_slices, n_channels, features)
+    all_slices = tf.stack(all_slices)  # Shape: (total_slices, n_channels, features)
+
+    # Ensure the total number of slices is divisible by steps
+    total_slices = all_slices.shape[0]
+    if total_slices % steps != 0:
+        raise ValueError(
+            "The total number of slices must be divisible by the number of steps."
+        )
+
+    n_samples = total_slices // steps  # Number of sample slots
+
+    # Reshape into (n_samples, steps, n_channels, features)
+    reshaped_slices = tf.reshape(all_slices, (n_samples, steps, n_channels, -1))
+
+    # Transpose to (n_samples, n_channels, features, steps)
+    tensor = tf.transpose(reshaped_slices, perm=[0, 2, 3, 1])
+
+    return tensor
 
 def scale_across_time_tf(data: tf.Tensor, scalers: list[dict]) -> tf.Tensor:
     """
     Scales data across time using precomputed scalers.
+    The features in each channel are scaled independently using the mean and standard deviation computed for that channel and feature.
     Parameters:
         - data: Input data tensor. Shape (samples, channels, bins, time_steps).
-        - scalers: A list of dictionaries containing 'mean' and 'std' for each channel.
+        - scalers: A list of dictionaries containing keys 'mean' and 'std'. Each dictionary corresponds to a channel.
+                   Both 'mean' and 'std' are 1D arrays with the same length as the number of features.
     Returns:
         - scaled_data: The scaled data as a TensorFlow tensor.
     """
