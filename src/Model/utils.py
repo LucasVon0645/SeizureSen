@@ -2,6 +2,7 @@ import os
 import sys
 import joblib
 import json
+from typing import Optional
 from keras.api.models import Model
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
@@ -66,8 +67,9 @@ def load_scalers_from_config(config: dict) -> tuple[list[dict], list[dict]]:
 
     return scalers_time, scalers_freq
 
+def load_config(config_path) -> Optional[dict]:
 
-def load_config(config_path) -> dict | None:
+    #def load_config(config_path) -> dict | None:
     """
     Loads the configuration from a JSON file specified by self.config_path.
     The configuration is read from the file and stored in the self.config attribute
@@ -100,4 +102,3 @@ def load_config(config_path) -> dict | None:
         config = json.load(file)
 
     return config
-
