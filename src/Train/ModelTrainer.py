@@ -11,6 +11,7 @@ import tensorflow as tf
 from keras.api.utils import to_categorical, plot_model
 from keras.api.models import Model
 from keras.api.callbacks import ModelCheckpoint
+from typing import Optional
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
@@ -48,26 +49,26 @@ class ModelTrainer:
 
         self.config = load_config(cfg_path)
 
-        self.model: Model | None = None
+        self.model: Optional[Model] = None
         self.model_class = model_class  # Store the model class for later use
 
         # Freq Domain Tensorflow Tensors (n_samples, n_channels, fft_bins, steps)
-        self.X_train_freq: tf.Tensor | None = None
-        self.X_test_freq: tf.Tensor | None = None
+        self.X_train_freq: Optional[tf.Tensor] = None
+        self.X_test_freq: Optional[tf.Tensor] = None
 
         # Time Domain Tensorflow Tensors (n_samples, n_channels, pca_bins, steps)
-        self.X_train_time: tf.Tensor | None = None
-        self.X_test_time: tf.Tensor | None = None
+        self.X_train_time: Optional[tf.Tensor] = None
+        self.X_test_time: Optional[tf.Tensor] = None
 
         # Label Tensors (n_samples,)
-        self.y_train: tf.Tensor | None = None
-        self.y_test: tf.Tensor | None = None
+        self.y_train: Optional[tf.Tensor]= None
+        self.y_test: Optional[tf.Tensor] = None
 
         # Scalers for both time and frequency domain
         # Lists of dictionaries {"mean": float, "std": float}
         # One dictionary per channel
-        self.scalers_time: list[dict] | None = None
-        self.scalers_freq: list[dict] | None = None
+        self.scalers_time: Optional[list[dict]] = None
+        self.scalers_freq: Optional[list[dict]] = None
 
         matplotlib.use(
             "Agg"
@@ -77,7 +78,9 @@ class ModelTrainer:
 
         os.makedirs(model_path, exist_ok=True)
 
-    def load_data(self, file_names_dict: dict | None = None):
+    def load_data(self, file_names_dict: Optional[dict] = None):
+
+        #def load_data(self, file_names_dict=dict | None):
         """
         Load and preprocess EEG data for training and evaluation.
         This function loads preprocessed EEG data from specified files,

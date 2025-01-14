@@ -1,14 +1,13 @@
 import os
 import sys
 
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
 from src.Train.ModelTrainer import ModelTrainer
 from src.Model.MultiViewConvModel import MultiViewConvModel
 from src.Model.MultiViewConvModelAttention import MultiViewConvModelWithAttention
 
-config_path = os.path.join("models", "config", "attention_test_cfg.json")
+config_path = os.path.join("models", "config", "first_test_cfg.json")
 data_path = os.path.join("data", "preprocessed", "Dog_1")
 
 trainer = ModelTrainer(cfg_path=config_path, data_directory=data_path, model_class=MultiViewConvModelWithAttention)
@@ -20,7 +19,7 @@ preprocessed_filenames = {
     "time_test": "time_domain_test.npz",
 }
 
-trainer.load_data(file_names_dict=preprocessed_filenames)
+trainer.load_data()
 
 print("\n\nConfiguration settings")
 print(trainer.config)
