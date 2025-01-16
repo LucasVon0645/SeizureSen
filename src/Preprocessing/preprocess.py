@@ -10,6 +10,7 @@ from src.Preprocessing.utils import (
     eeg_slices,
     save_preprocessed_data,
     resample_and_apply_bandpass_filter,
+    overlap,
 )
 from src.Preprocessing.Feature import Feature
 
@@ -44,7 +45,7 @@ loaded_data = data_extractor.get_data()
 metadata = data_extractor.get_metadata()
 print("Metadata: ", metadata)
 
-train_segments = loaded_data["preictal"] + loaded_data["interictal"]
+train_segments = loaded_data["preictal"]+ loaded_data["interictal"]
 test_segments = loaded_data["test"]
 
 # Resample and apply bandpass filter to EEG data
@@ -66,6 +67,8 @@ for eeg_segment in tqdm(test_segments, desc="Filtering test segments"):
     )
 test_segments = test_segments_filtered
 
+
+print(f"Selected training segments: {len(train_segments)}")
 train_slices_with_label = (
     []
 )  # To store slices for all training segments along with their labels
@@ -74,13 +77,27 @@ test_slices_with_label = (
 )  # To store slices for all test segments along with their labels
 
 # Slice the 10-minute segments into 30-second slices. A label is assigned to each slice.
-for eeg_data_segment, label in tqdm(train_segments, desc="Slicing train segments"):
-    slices = eeg_slices(eeg_data_segment, SAMPLING_FREQ, WINDOW_DURATION)
-    train_slices_with_label.extend([(eeg_slice, label) for eeg_slice in slices])
+for segment in tqdm(train_segments, desc="Slicing train segments"):
+    slices = eeg_slices(segment['eeg_data'], SAMPLING_FREQ, WINDOW_DURATION)
+    train_slices_with_label.extend([(eeg_slice, segment['label']) for eeg_slice in slices])
+# Data Augmentation: Call the overlap function
+print("Applying data augmentation using overlap...")
+train_slices, train_labels = zip(*train_slices_with_label)  # Unpack slices and labels
+train_slices = np.array(train_slices)
+train_labels = np.array(train_labels)
 
-for eeg_data_segment, label in tqdm(test_segments, desc="Slicing test segments"):
-    slices = eeg_slices(eeg_data_segment, SAMPLING_FREQ, WINDOW_DURATION)
-    test_slices_with_label.extend([(eeg_slice, label) for eeg_slice in slices])
+# Call the overlap function
+train_slices_augmented, train_labels_augmented = overlap(train_slices, train_labels)
+
+# Repack the augmented data
+train_slices_with_label = list(zip(train_slices_augmented, train_labels_augmented))
+
+print(f"Original training samples: {len(train_labels)}")
+print(f"Augmented training samples: {len(train_labels_augmented)}")
+
+for segment in tqdm(test_segments, desc="Slicing test segments"):
+    slices = eeg_slices(segment['eeg_data'], SAMPLING_FREQ, WINDOW_DURATION)
+    test_slices_with_label.extend([(eeg_slice, segment['label']) for eeg_slice in slices])
 
 print(f"Number of slices for training: {len(train_slices_with_label)}")
 print(f"Number of slices for testing: {len(test_slices_with_label)}")
