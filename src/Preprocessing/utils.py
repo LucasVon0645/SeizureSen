@@ -28,6 +28,64 @@ def eeg_slices(eeg_data, sampling_freq, window_duration):
     return slices
 
 
+def overlap(x, y):
+    """
+    Used to enhance imbalanced data by combining the first half and the second half of different samples
+    to generate new samples.
+
+    Parameters:
+        x: np.ndarray
+            Input feature data, shape is [number of samples, number of channels, number of timesteps].
+        y: np.ndarray
+            Corresponding labels, shape is [number of samples].
+
+    Returns:
+        x_augmented: np.ndarray
+            Enhanced feature data.
+        y_augmented: np.ndarray
+            Enhanced labels.
+    """
+    shape_x = x.shape
+    zero_indices = np.where(y == 0)[0].tolist()  # Find the indices of samples with label 0
+    one_indices = np.where(y == 1)[0].tolist()  # Find the indices of samples with label 1
+
+    # Divide the timesteps into two halves
+    time_steps = shape_x[2]  # The third dimension represents the number of timesteps
+    first_part = time_steps // 2
+
+    # Initialize augmented data
+    tmp_x = []
+    tmp_y = []
+
+    # Augment samples with label 0
+    for i in range(len(zero_indices) - 1):
+        tmp = np.concatenate(
+            (x[zero_indices[i], :, :first_part], x[zero_indices[i + 1], :, first_part:]),
+            axis=1
+        )
+        tmp_x.append(tmp)
+        tmp_y.append(0)
+
+    # Augment samples with label 1
+    for i in range(len(one_indices) - 1):
+        tmp = np.concatenate(
+            (x[one_indices[i], :, :first_part], x[one_indices[i + 1], :, first_part:]),
+            axis=1
+        )
+        tmp_x.append(tmp)
+        tmp_y.append(1)
+
+    # Convert the augmented data to numpy arrays
+    tmp_x = np.array(tmp_x)
+    tmp_y = np.array(tmp_y)
+
+    # Combine the original data with the augmented data
+    x_augmented = np.concatenate((x, tmp_x), axis=0)
+    y_augmented = np.concatenate((y, tmp_y), axis=0)
+
+    return x_augmented, y_augmented
+
+
 def save_preprocessed_data(directory, filename="preprocessed_data.npz", **data):
     """
     Save preprocessed data to a specified directory in .npz format.
@@ -67,8 +125,8 @@ def load_preprocessed_data(data_directory, file_name="preprocessed_data.npz"):
     Raises:
     FileNotFoundError: If the specified file does not exist.
     Example:
-    >>> data = load_preprocessed_data("data")
-    >>> print(data.keys())
+    data = load_preprocessed_data("data")
+    print(data.keys())
     dict_keys(['key1', 'key2', 'key3'])
     """
 
