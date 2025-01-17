@@ -31,10 +31,14 @@ class SeizureSenPredictor:
         """
 
         X_time, X_freq = self._preprocess_eeg(time_slices_list)
-        prob = 0.9
+        probabilities = self.model.predict([X_time, X_freq])
 
-        return "interictal", prob
+        prob = probabilities[0, 1]  # Probability of "preictal" (class 1)
+        threshold = 0.5
+        label = "preictal" if prob > threshold else "interictal"
 
+        return label, prob
+    
     def _preprocess_eeg(
         self, time_slices_list: list[np.ndarray]
     ) -> tuple[tf.Tensor, tf.Tensor]:

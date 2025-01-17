@@ -124,6 +124,8 @@ def app(seizure_sen_predictor: SeizureSenPredictor):
                 )
 
                 placeholder = st.empty()
+                prediction_placeholder = st.empty()
+                pred_history = []   # List to store prediction history
 
                 if st.sidebar.button("Generate", key="Generate"):
                     # Initialize an empty array to store cumulative data
@@ -137,7 +139,7 @@ def app(seizure_sen_predictor: SeizureSenPredictor):
                     
                     # Initialize time chunks list and prediction history
                     time_chunks_list = [] # List to store time chunks that will be used at the same time to make a prediction
-                    pred_history = [] # List to store prediction history
+
                     time_steps_model = seizure_sen_predictor.get_model_time_steps()
 
                     for chunk in simulate_streaming(
@@ -176,12 +178,13 @@ def app(seizure_sen_predictor: SeizureSenPredictor):
                             prediction_window = time_steps_model * 30
                             pred, prob = seizure_sen_predictor.classify_eeg(time_chunks_list)
                             pred_history.append(pred)
-                            st.write(pred_history)
-                            st.write(f"Last Prediction made on the last {prediction_window} seconds: {pred} segment detected with probability {prob:.2f}")
-                            if pred == "preictal":
-                                st.error("A seizure will likely happen!", icon="🚨")
-                            else:
-                                st.warning("No seizure predicted so far", icon="😌")
+                            with prediction_placeholder.container():
+                                st.write(pred_history)
+                                st.write(f"Last Prediction made on the last {prediction_window} seconds: {pred} segment detected with probability {prob:.2f}")
+                                if pred == "preictal":
+                                    st.error("A seizure will likely happen!", icon="🚨")
+                                else:
+                                    st.success("No seizure predicted so far", icon="😌")
                             
                             time_chunks_list = [] # Reset time chunks list
 
@@ -190,7 +193,6 @@ def app(seizure_sen_predictor: SeizureSenPredictor):
                             progress_bar.progress(
                                 chunk_index / total_chunks, text="Simulation Progress"
                             )
-
                             rows_cols_index_grid = [(1, 1), (1, 2), (2, 1), (2, 2)]
 
                             for idx, channel_index in enumerate(selected_indices):
