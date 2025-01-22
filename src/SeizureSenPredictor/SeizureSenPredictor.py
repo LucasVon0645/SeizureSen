@@ -12,7 +12,7 @@ from src.Preprocessing.utils import transform_features_to_tensor, scale_across_t
 
 
 class SeizureSenPredictor:
-    def __init__(self, model_config_path):
+    def __init__(self, model_config_path, use_early_exits=False):
         self.config = load_config(model_config_path)
 
         # Load the model
@@ -22,8 +22,9 @@ class SeizureSenPredictor:
         )
 
         self.scalers_time, self.scalers_freq = load_scalers_from_config(self.config)
-
-    def classify_eeg(self, time_slices_list: list[np.ndarray]):
+        self.use_early_exits = use_early_exits
+        
+    def classify_eeg(self, time_slices_list: list[np.ndarray], threshold=0.5):
         """
         Classify EEG data as interictal or preictal.
         :param time_slices_list: A list of 30s time slices of EEG data.
@@ -31,14 +32,38 @@ class SeizureSenPredictor:
         """
 
         X_time, X_freq = self._preprocess_eeg(time_slices_list)
-        probabilities = self.model.predict([X_time, X_freq])
 
-        prob = probabilities[0, 1]  # Probability of "preictal" (class 1)
-        threshold = 0.5
-        label = "preictal" if prob > threshold else "interictal"
+        n_samples = X_freq.shape[0]
+        channels = X_freq.shape[1]
+        fft_bins = X_freq.shape[2]
+        pca_bins = X_time.shape[2]
+        steps = X_time.shape[3]
+
+        if n_samples != 1:
+            raise ValueError("The model can only classify one sample at a time!")
+
+        # Reshape inputs for the model
+        # The last dimension of the input shape is 1 because the input data
+        # is single-channel (like grayscale image)
+        X_freq = tf.reshape(X_freq, [n_samples, channels * fft_bins, steps, 1])
+        X_time = tf.reshape(X_time, [n_samples, channels * pca_bins, steps, 1])
+
+        y_pred = self.model.predict([X_time, X_freq])
+
+        if self.use_early_exits:
+            y_pred_final = y_pred[0]
+            prob = y_pred_final[0, 1] # The probability of preictal class
+        else:
+            prob = y_pred[0, 1] # The probability of preictal class
+            
+        if prob > threshold:
+            label = "preictal"
+        else:
+            label = "interictal"
+            prob = 1 - prob # The probability of interictal class
 
         return label, prob
-    
+
     def _preprocess_eeg(
         self, time_slices_list: list[np.ndarray]
     ) -> tuple[tf.Tensor, tf.Tensor]:
