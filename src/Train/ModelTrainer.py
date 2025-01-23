@@ -240,13 +240,12 @@ class ModelTrainer:
 
     #! implement the augment_train_data method
     def augment_train_data(self):
-
-        # Reshape data for SMOTE/ADASYN
+        # Reshape data for SMOTE
         X_train_freq_reshaped = self.X_train_freq.numpy().reshape((self.X_train_freq.shape[0], -1))
         X_train_time_reshaped = self.X_train_time.numpy().reshape((self.X_train_time.shape[0], -1))
         y_train = self.y_train.numpy()
 
-        # Apply SMOTE or ADASYN to augment the preictal data
+        # Apply SMOTE to augment the preictal data
         smote = SMOTE(sampling_strategy='minority')
         X_train_freq_resampled, y_train_resampled = smote.fit_resample(X_train_freq_reshaped, y_train)
         X_train_time_resampled, _ = smote.fit_resample(X_train_time_reshaped, y_train)
