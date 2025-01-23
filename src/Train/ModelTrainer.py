@@ -6,12 +6,14 @@ import matplotlib
 
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
+from imblearn.over_sampling import SMOTE, ADASYN
 
 import tensorflow as tf
 from keras.api.utils import to_categorical, plot_model
 from keras.api.models import Model
 from keras.api.callbacks import ModelCheckpoint
 from typing import Optional
+from src.Preprocessing.utils import overlap
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
@@ -238,7 +240,24 @@ class ModelTrainer:
 
     #! implement the augment_train_data method
     def augment_train_data(self):
-        pass
+
+        # Reshape data for SMOTE/ADASYN
+        X_train_freq_reshaped = self.X_train_freq.numpy().reshape((self.X_train_freq.shape[0], -1))
+        X_train_time_reshaped = self.X_train_time.numpy().reshape((self.X_train_time.shape[0], -1))
+        y_train = self.y_train.numpy()
+
+        # Apply SMOTE or ADASYN to augment the preictal data
+        smote = SMOTE(sampling_strategy='minority')
+        X_train_freq_resampled, y_train_resampled = smote.fit_resample(X_train_freq_reshaped, y_train)
+        X_train_time_resampled, _ = smote.fit_resample(X_train_time_reshaped, y_train)
+
+        # Reshape back to original dimensions
+        self.X_train_freq = tf.convert_to_tensor(X_train_freq_resampled.reshape((-1, *self.X_train_freq.shape[1:])))
+        self.X_train_time = tf.convert_to_tensor(X_train_time_resampled.reshape((-1, *self.X_train_time.shape[1:])))
+        self.y_train = tf.convert_to_tensor(y_train_resampled)
+
+
+
 
     def train(self, use_early_exits=False):
         """
