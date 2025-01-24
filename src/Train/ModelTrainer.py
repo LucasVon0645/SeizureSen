@@ -1,11 +1,12 @@
 import os
 import sys
 import joblib
+import numpy as np
 import pandas as pd
 import matplotlib
 
-from sklearn.metrics import classification_report
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, accuracy_score
+from sklearn.model_selection import train_test_split, StratifiedKFold
 
 import tensorflow as tf
 from keras.api.utils import to_categorical, plot_model
@@ -254,8 +255,6 @@ class ModelTrainer:
 
         self._validate_input(train=True)
 
-        self.augment_train_data()
-
         # Compute the scalers for the time domain and scale
         self.compute_scalers_transform(time_domain=True)
         # Perform the same for the frequency domain data
@@ -332,79 +331,42 @@ class ModelTrainer:
 
         self.model = multi_view_conv_model
 
+
         print("Fitting the model...")
         print("Final output shape:", multi_view_conv_model.output[0].shape)
 
-        if not use_early_exits:
-            # Train the model
-            history = multi_view_conv_model.fit(
-                {"time_domain_input": X_pca_train, "freq_domain_input": X_fft_train},
-                y_train,
-                validation_data=(
-                    {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val},
-                    {"final_output": y_val},
-                ),
-                epochs=config["nb_epoch"],
-                verbose=1,
-                batch_size=config["batch_size"],
-                callbacks=[
-                    early_stopping,
-                    checkpoint,
-                ],  # Add early stopping and checkpoint callbacks
-            )
+        fit_args = {
+            "x": {"time_domain_input": X_pca_train, "freq_domain_input": X_fft_train},
+            "validation_data": (
+            {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val},
+            {"final_output": y_val},
+            ),
+            "epochs": config["nb_epoch"],
+            "verbose": 1,
+            "batch_size": config["batch_size"],
+            "callbacks": [early_stopping, checkpoint],
+        }
 
-        else:
-            multi_view_conv_model.compile(
-                optimizer="adam",
-                loss={
-                    "final_output": "categorical_crossentropy",
-                    "early_exit1": "categorical_crossentropy",
-                    "early_exit2": "categorical_crossentropy",
-                    "early_exit3": "categorical_crossentropy",
-                    "early_exit4": "categorical_crossentropy",
-                },
-                # Weights for the losses of the different outputs
-                loss_weights={
-                    "final_output": 1.0,
-                    "early_exit1": 0.5,
-                    "early_exit2": 0.7,
-                    "early_exit3": 0.8,
-                    "early_exit4": 1.0,
-                },
-                metrics={
-                    "final_output": ["accuracy"],
-                    "early_exit1": ["accuracy"],
-                    "early_exit2": ["accuracy"],
-                    "early_exit3": ["accuracy"],
-                    "early_exit4": ["accuracy"],
-                },
-            )
-            
+        if use_early_exits:
             print("Early exits shape:", [output.shape for output in multi_view_conv_model.outputs[1:]])
+            fit_args["y"] = {
+            "final_output": y_train,
+            "early_exit1": y_train,
+            "early_exit2": y_train,
+            "early_exit3": y_train,
+            "early_exit4": y_train,
+            }
+            fit_args["validation_data"][1].update({
+            "early_exit1": y_val,
+            "early_exit2": y_val,
+            "early_exit3": y_val,
+            "early_exit4": y_val,
+            })
+        else:
+            fit_args["y"] = y_train
+            fit_args["class_weight"] = {0: 1.0, 1: config["preictal_class_weight"]}
 
-            history = multi_view_conv_model.fit(
-                {"time_domain_input": X_pca_train, "freq_domain_input": X_fft_train},
-                {
-                    "final_output": y_train,
-                    "early_exit1": y_train,
-                    "early_exit2": y_train,
-                    "early_exit3": y_train,
-                    "early_exit4": y_train,
-                },
-                validation_data=(
-                    {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val},
-                    {
-                        "final_output": y_val,
-                        "early_exit1": y_val,
-                        "early_exit2": y_val,
-                        "early_exit3": y_val,
-                        "early_exit4": y_val,
-                    },
-                ),
-                epochs=config["nb_epoch"],
-                batch_size=config["batch_size"],
-                callbacks=[early_stopping, checkpoint],
-            )
+        history = multi_view_conv_model.fit(**fit_args)
 
         print("\n\nTraining completed!")
 
@@ -414,29 +376,18 @@ class ModelTrainer:
         print("\nTrain Loss over epochs: ", history.history["loss"])
 
         if use_early_exits:
-            print(
-                "\nValidation Accuracy for 'final_output' over epochs: ",
+            for i in range(1, 5):
+                print(
+                    f"Validation Accuracy for 'early_exit{i}' over epochs: ",
+                    history.history[f"val_early_exit{i}_accuracy"],
+                )
+                print(
+                "Validation Accuracy for 'final_output' over epochs: ",
                 history.history["val_final_output_accuracy"],
-            )
-            print(
-                "Validation Accuracy for 'early_exit1' over epochs: ",
-                history.history["val_early_exit1_accuracy"],
-            )
-            print(
-                "Validation Accuracy for 'early_exit2' over epochs: ",
-                history.history["val_early_exit2_accuracy"],
-            )
-            print(
-                "Validation Accuracy for 'early_exit3' over epochs: ",
-                history.history["val_early_exit3_accuracy"],
-            )
-            print(
-                "Validation Accuracy for 'early_exit4' over epochs: ",
-                history.history["val_early_exit4_accuracy"],
-            )
+                )
         else:
             print("Train Accuracy over epochs: ", history.history["accuracy"])
-
+            
         print("\n\nModel Validation")
 
         print("\nValidation Loss over epochs: ", history.history["val_loss"])
@@ -465,6 +416,169 @@ class ModelTrainer:
             show_layer_activations=True,
         )
 
+    def train_fold(self, X_fft_train, X_fft_val, X_pca_train, X_pca_val, y_train, y_val, fold_index):
+        """
+        Train the model on a single fold.
+
+        Parameters:
+        - X_fft_train, X_fft_val: Frequency domain training and validation data.
+        - X_pca_train, X_pca_val: Time domain training and validation data.
+        - y_train, y_val: Training and validation labels.
+        - config: Configuration dictionary.
+        - fold_index: Fold index for saving checkpoints and logging.
+
+        Returns:
+        - model: The trained model.
+        - metrics: Dictionary containing metrics for the fold.
+        """
+
+        # Convert target labels to categorical
+        y_train = to_categorical(y_train, num_classes=2).astype("float32")
+        y_val = to_categorical(y_val, num_classes=2).astype("float32")
+
+        # Set up checkpoint path
+        checkpoint_path = os.path.join(
+            self.config["model_path"], f"checkpoint_fold_{fold_index}", "best_model.keras"
+        )
+        os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+        checkpoint = ModelCheckpoint(
+            checkpoint_path, monitor="val_loss", save_best_only=True, verbose=1
+        )
+
+        # Get model and callbacks
+        model, early_stopping = self.model_class.get_model(self.config)
+
+        # Train the model
+        model.fit(
+            {"time_domain_input": X_pca_train, "freq_domain_input": X_fft_train},
+            y_train,
+            validation_data=(
+                {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val},
+                {"final_output": y_val},
+            ),
+            epochs=self.config["nb_epoch"],
+            verbose=1,
+            batch_size=self.config["batch_size"],
+            callbacks=[early_stopping, checkpoint],
+            class_weight={0: 1.0, 1: self.config["preictal_class_weight"]},  # Higher weight for minority class
+        )
+
+        # Generate predictions for the validation set
+        y_val_pred = model.predict(
+            {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val}
+        )
+        y_val_pred = np.argmax(y_val_pred, axis=1)
+        y_val_true = np.argmax(y_val, axis=1)
+
+        # Compute metrics
+        metrics = classification_report(
+            y_val_true, y_val_pred, target_names=["interictal", "preictal"], output_dict=True
+        )
+        metrics["accuracy"] = accuracy_score(y_val_true, y_val_pred)
+
+        return model, metrics
+
+    def train_with_cross_validation(self, n_splits=5):
+        """
+        Train the model using stratified k-fold cross-validation.
+
+        Parameters:
+        - n_splits: Number of folds for cross-validation.
+        """
+
+        print("\n\nTraining the model with stratified cross-validation...")
+        self._validate_input(train=True)
+        self.augment_train_data()
+
+        # Compute and scale train data
+        self.compute_scalers_transform(time_domain=True)
+        self.compute_scalers_transform(time_domain=False)
+
+        X_fft = self.X_train_freq.numpy()
+        X_pca = self.X_train_time.numpy()
+        y = self.y_train.numpy()
+
+        n_samples = X_fft.shape[0]
+        channels = X_fft.shape[1]
+        fft_bins = X_fft.shape[2]
+        pca_bins = X_pca.shape[2]
+        steps = X_fft.shape[3]
+
+        # Reshape inputs for the model
+        X_fft = tf.reshape(X_fft, [n_samples, channels * fft_bins, steps, 1])
+        X_pca = tf.reshape(X_pca, [n_samples, channels * pca_bins, steps, 1])
+
+        # Stratified k-fold
+        skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+        all_metrics = []
+
+        for fold_index, (train_idx, val_idx) in enumerate(skf.split(X_fft, y), start=1):
+            print(f"\n\nTraining fold {fold_index}/{n_splits}...")
+            X_fft_numpy = X_fft.numpy()  # Convert from tensor to numpy array
+            X_pca_numpy = X_pca.numpy()
+
+            X_fft_train, X_fft_val = X_fft_numpy[train_idx], X_fft_numpy[val_idx]
+            X_pca_train, X_pca_val = X_pca_numpy[train_idx], X_pca_numpy[val_idx]
+            y_train, y_val = y[train_idx], y[val_idx]
+
+            print(f"Fold {fold_index} class distribution:")
+            print(pd.Series(y_train).value_counts())
+
+            _, metrics = self.train_fold(
+                X_fft_train, X_fft_val, X_pca_train, X_pca_val, y_train, y_val, fold_index
+            )
+            all_metrics.append(metrics)
+
+        # Print and save the cross-validation results
+        self.print_and_save_cross_validation_results(all_metrics)
+
+    def print_and_save_cross_validation_results(self, all_metrics: dict, filename="cross_validation_results.txt"):
+        """
+        Print the average metrics from cross-validation.
+
+        Parameters:
+        - all_metrics: List of classification reports for each fold.
+        - filename: Name of the file to save the results.
+        """
+        
+        metrics_to_print = {
+            "accuracy": "Average Accuracy",
+            "interictal_precision": "Average Precision (Interictal)",
+            "interictal_recall": "Average Recall (Interictal)",
+            "interictal_f1-score": "Average F1-Score (Interictal)",
+            "preictal_precision": "Average Precision (Preictal)",
+            "preictal_recall": "Average Recall (Preictal)",
+            "preictal_f1-score": "Average F1-Score (Preictal)",
+        }
+
+        avg_metrics = {
+            "accuracy": np.mean([metrics["accuracy"] for metrics in all_metrics]),
+            "interictal_precision": np.mean(
+            [metrics["interictal"]["precision"] for metrics in all_metrics]
+            ),
+            "interictal_recall": np.mean(
+            [metrics["interictal"]["recall"] for metrics in all_metrics]
+            ),
+            "interictal_f1-score": np.mean(
+            [metrics["interictal"]["f1-score"] for metrics in all_metrics]
+            ),
+            "preictal_precision": np.mean(
+            [metrics["preictal"]["precision"] for metrics in all_metrics]
+            ),
+            "preictal_recall": np.mean(
+            [metrics["preictal"]["recall"] for metrics in all_metrics]
+            ),
+            "preictal_f1-score": np.mean(
+            [metrics["preictal"]["f1-score"] for metrics in all_metrics]
+            ),
+        }
+
+        print("\n\nCross-Validation Results:")
+        with open(os.path.join(self.config["model_path"], filename), "w", encoding="utf-8") as f:
+            for key, description in metrics_to_print.items():
+                print(f"{description}: {avg_metrics[key]:.4f}")
+                f.write(f"{description}: {avg_metrics[key]:.4f}\n")
+
     def evaluate(self, use_early_exits=False):
         """
         Evaluate the multi-view convolutional neural network model.
@@ -475,20 +589,16 @@ class ModelTrainer:
         """
 
         self._validate_input(train=False)
-
-        # Scale the test data using the scalers learned from the training data
-        scale_across_time_tf(self.X_test_time, self.scalers_time)
-        scale_across_time_tf(self.X_test_freq, self.scalers_freq)
-
-        print("\n\nEvaluating the model...")
-
+        
         if self.X_test_freq is None or self.X_test_time is None or self.y_test is None:
             raise ValueError("Testing data is missing!")
 
-        # Get the test data
-        X_fft = self.X_test_freq
-        X_pca = self.X_test_time
+        # Scale the test data using the scalers learned from the training data
+        X_pca = scale_across_time_tf(self.X_test_time, self.scalers_time)
+        X_fft = scale_across_time_tf(self.X_test_freq, self.scalers_freq)
         y = self.y_test
+
+        print("\n\nEvaluating the model...")
 
         # Get the model
         multi_view_conv_model = self.model
@@ -498,6 +608,9 @@ class ModelTrainer:
         fft_bins = X_fft.shape[2]
         pca_bins = X_pca.shape[2]
         steps = X_fft.shape[3]
+        config = self.config
+        
+        use_early_exits = config.get("use_early_exits", False)
 
         # Reshape inputs for the model
         # The last dimension of the input shape is 1 because the input data
@@ -517,6 +630,178 @@ class ModelTrainer:
         self._get_classification_report(y_test, y_pred, use_early_exits, suffix="eval")
 
         print("\nEvaluation completed!")
+
+    def train_full_dataset(self):
+        """
+        Train the multi-view convolutional neural network model.
+        This method trains and validates the model using the training data.
+        All hyperparameters, the number of epochs and the batch size are specified
+        in the configuration settings.
+        The best model is saved to a file using the ModelCheckpoint callback in a directory
+        "checkpoint" within the model directory specified in the configuration.
+        """
+
+        print("\n\nTraining the model...")
+
+        self._validate_input(train=True)
+
+        # Compute the scalers for the time domain and scale
+        self.compute_scalers_transform(time_domain=True)
+        # Perform the same for the frequency domain data
+        self.compute_scalers_transform(time_domain=False)
+
+        print("\n\nTrain data scaling completed")
+
+        if (
+            self.X_train_freq is None
+            or self.X_train_time is None
+            or self.y_train is None
+        ):
+            raise ValueError("Training data is missing!")
+
+        X_fft_train = self.X_train_freq
+        X_pca_train = self.X_train_time
+        y_train = self.y_train
+        config = self.config
+        
+        use_early_exits = config.get("use_early_exits", False)
+
+        n_samples_train = X_fft_train.shape[0]
+        channels = X_fft_train.shape[1]
+        fft_bins = X_fft_train.shape[2]
+        pca_bins = X_pca_train.shape[2]
+        steps = X_fft_train.shape[3]
+
+        # Reshape inputs for the model
+        # The last dimension of the input shape is 1 because the input data
+        # is single-channel (like grayscale image)
+        X_fft_train = tf.reshape(X_fft_train, [n_samples_train, channels * fft_bins, steps, 1])
+        X_pca_train = tf.reshape(X_pca_train, [n_samples_train, channels * pca_bins, steps, 1])
+
+        # Scale the test data using the scalers learned from the training data
+        X_fft_val = scale_across_time_tf(self.X_test_freq, self.scalers_freq)
+        X_pca_val = scale_across_time_tf(self.X_test_time, self.scalers_time)
+        y_val = self.y_test
+        
+        n_samples_test = X_fft_val.shape[0]
+        
+        X_fft_val = tf.reshape(X_fft_val, [n_samples_test, channels * fft_bins, steps, 1])
+        X_pca_val = tf.reshape(X_pca_val, [n_samples_test, channels * pca_bins, steps, 1])
+
+        # Print the class distribution for the training
+        train_dist = (
+            pd.Series(y_train).map({0: "interictal", 1: "preictal"}).value_counts()
+        )
+        print("\n\nTraining data class distribution:")
+        print(train_dist)
+        # Print the class distribution for the validation
+        val_dist = pd.Series(y_val).map({0: "interictal", 1: "preictal"}).value_counts()
+        print("\n\nValidation data class distribution:")
+        print(val_dist, "\n\n")
+
+        # Convert the target labels to categorical, as it's a classification task
+        # The labels are one-hot encoded (e.g., [0, 1] for preictal and [1, 0] for interictal)
+        y_train = to_categorical(y_train, num_classes=2).numpy()
+        y_val = to_categorical(y_val, num_classes=2).numpy()
+
+        y_train = y_train.astype("float32")
+        y_val = y_val.astype("float32")
+
+        # Add model checkpoint callback to automatically save the best model
+        model_path = self.config["model_path"]
+        checkpoint_path = os.path.join(model_path, "checkpoint", "best_model.keras")
+        os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
+        checkpoint = ModelCheckpoint(
+            checkpoint_path, monitor="val_loss", save_best_only=True, verbose=1
+        )
+
+        # Create non-trained model object and get the early stopping callback
+        multi_view_conv_model, early_stopping = self.model_class.get_model(config)
+
+        self.model = multi_view_conv_model
+
+
+        print("Fitting the model...")
+        print("Final output shape:", multi_view_conv_model.output[0].shape)
+
+        fit_args = {
+            "x": {"time_domain_input": X_pca_train, "freq_domain_input": X_fft_train},
+            "validation_data": (
+            {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val},
+            {"final_output": y_val},
+            ),
+            "epochs": config["nb_epoch"],
+            "verbose": 1,
+            "batch_size": config["batch_size"],
+            "callbacks": [early_stopping, checkpoint],
+        }
+
+        if use_early_exits:
+            print("Early exits shape:", [output.shape for output in multi_view_conv_model.outputs[1:]])
+            fit_args["y"] = {
+            "final_output": y_train,
+            "early_exit1": y_train,
+            "early_exit2": y_train,
+            "early_exit3": y_train,
+            "early_exit4": y_train,
+            }
+            fit_args["validation_data"][1].update({
+            "early_exit1": y_val,
+            "early_exit2": y_val,
+            "early_exit3": y_val,
+            "early_exit4": y_val,
+            })
+        else:
+            fit_args["y"] = y_train
+            fit_args["class_weight"] = {0: 1.0, 1: config["preictal_class_weight"]}
+
+        history = multi_view_conv_model.fit(**fit_args)
+
+        print("\n\nTraining completed!")
+
+        # Save the scalers to a file
+        self.save_scalers()
+
+        print("\nTrain Loss over epochs: ", history.history["loss"])
+
+        if use_early_exits:
+            for i in range(1, 5):
+                print(
+                    f"Validation Accuracy for 'early_exit{i}' over epochs: ",
+                    history.history[f"val_early_exit{i}_accuracy"],
+                )
+                print(
+                "Validation Accuracy for 'final_output' over epochs: ",
+                history.history["val_final_output_accuracy"],
+                )
+        else:
+            print("Train Accuracy over epochs: ", history.history["accuracy"])
+
+        print("\n\nModel Validation")
+
+        print("\nValidation Loss over epochs: ", history.history["val_loss"], "\n")
+
+        y_pred = multi_view_conv_model.predict(
+            {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val}
+        )
+
+        # Get the classification report for the validation data and save it
+        self._get_classification_report(y_val, y_pred, use_early_exits, suffix="val")
+
+        # Save the training history
+        plot_training_history(history, config["model_path"])
+
+        # Uncomment the two following lines only if you have graphviz installed!
+        filepath = os.path.join(
+            config["model_path"], config["name"] + "_architecture.png"
+        )
+        plot_model(
+            multi_view_conv_model,
+            to_file=filepath,
+            show_shapes=True,
+            show_layer_names=True,
+            show_layer_activations=True,
+        )
 
     def load_model(self):
         """
@@ -618,7 +903,7 @@ class ModelTrainer:
                 or X_test_fft.shape[0] != y_test.shape[0]
             ):
                 raise ValueError(
-                    "Number of samples in X_test_fft, X_test_pca, and y_test must be equal."
+                    f"Number of samples in X_test_fft, X_test_pca, and y_test must be equal. But got: {(X_test_fft.shape[0], X_test_pca.shape[0], y_test.shape[0])}"
                 )
             if X_test_fft.shape[-1] != X_test_pca.shape[-1]:
                 raise ValueError(

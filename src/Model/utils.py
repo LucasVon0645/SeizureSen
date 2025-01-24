@@ -84,12 +84,14 @@ def load_config(config_path) -> Optional[dict]:
         "nn_freq_output": int,
         "batch_size": int,
         "nb_epoch": int,
-        "name": "first_test",
+        "name": str,
         "model_path": str,
         "model_time_steps": int,
         "channels": int,
         "fft_bins": int,
-        "pca_bins": int
+        "pca_bins": int,
+        "preictal_class_weight": float,
+        
     }
     Obs.: model_path is the relative path from the project root.
     It is used to save/load the trained model, as well the scalers.

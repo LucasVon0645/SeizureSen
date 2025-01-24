@@ -48,6 +48,8 @@ class MultiViewConvModel:
         pca_bins = config["pca_bins"]
         fft_bins = config["fft_bins"]
         steps = config["model_time_steps"]
+        
+        use_early_exits = config.get("use_early_exits", False)
 
         # Define first input branch for the time domain
         # The last dimension of the input shape is 1 because the input data
@@ -64,7 +66,7 @@ class MultiViewConvModel:
 
         seq1 = Dropout(config["dropout"], name="time_dropout_layer1")(seq1)
 
-        # early_exit1 = Dense(2, activation="sigmoid", name="early_exit1")(Flatten()(seq1))
+        early_exit1 = Dense(2, activation="sigmoid", name="early_exit1")(Flatten()(seq1))
 
         seq1 = Conv2D(
             filters=config["nb_filter"],
@@ -76,7 +78,7 @@ class MultiViewConvModel:
 
         seq1 = Dropout(config["dropout"], name="time_dropout_layer2")(seq1)
 
-        # early_exit2 = Dense(2, activation="sigmoid", name="early_exit2")(Flatten()(seq1))
+        early_exit2 = Dense(2, activation="sigmoid", name="early_exit2")(Flatten()(seq1))
 
         seq1 = Flatten(name="time_flatten_layer")(seq1)
 
@@ -96,7 +98,7 @@ class MultiViewConvModel:
 
         seq2 = Dropout(config["dropout"], name="freq_dropout_layer1")(seq2)
 
-        # early_exit3 = Dense(2, activation="sigmoid", name="early_exit3")(Flatten()(seq2))
+        early_exit3 = Dense(2, activation="sigmoid", name="early_exit3")(Flatten()(seq2))
 
         seq2 = Conv2D(
             filters=config["nb_filter"],
@@ -108,7 +110,7 @@ class MultiViewConvModel:
 
         seq2 = Dropout(config["dropout"], name="freq_dropout_layer2")(seq2)
 
-        # early_exit4 = Dense(2, activation="sigmoid", name="early_exit4")(Flatten()(seq2))
+        early_exit4 = Dense(2, activation="sigmoid", name="early_exit4")(Flatten()(seq2))
 
         seq2 = Flatten(name="freq_flatten_layer")(seq2)
 
@@ -123,18 +125,42 @@ class MultiViewConvModel:
         # Add final classification layer with sigmoid activation for multi-class classification
         output = Dense(2, activation="sigmoid", name="final_output")(merged)
 
-        # Define the model
-        cnn_model = Model(
-            inputs=[input_time, input_freq],
-            # outputs=[output, early_exit1, early_exit2, early_exit3, early_exit4],
-            outputs=[output],
-        )
-
-        # Choose optimizer based on the setting
-        sgd = SGD(learning_rate=config["learning_rate"])
-        cnn_model.compile(
-            loss="binary_crossentropy", optimizer=sgd, metrics=["accuracy"]
-        )
+        # Model definition
+        if use_early_exits:
+            # Create a model with early exits
+            cnn_model = Model(inputs=[input_time, input_freq], outputs=[output, early_exit1, early_exit2, early_exit3, early_exit4])
+            cnn_model.compile(
+                optimizer=SGD(learning_rate=config["learning_rate"]),
+                loss={
+                    "final_output": "categorical_crossentropy",
+                    "early_exit1": "categorical_crossentropy",
+                    "early_exit2": "categorical_crossentropy",
+                    "early_exit3": "categorical_crossentropy",
+                    "early_exit4": "categorical_crossentropy",
+                },
+                # Weights for the losses of the different outputs
+                loss_weights={
+                    "final_output": 1.0,
+                    "early_exit1": 0.3,
+                    "early_exit2": 0.4,
+                    "early_exit3": 0.8,
+                    "early_exit4": 1.0,
+                },
+                metrics={
+                    "final_output": ["accuracy"],
+                    "early_exit1": ["accuracy"],
+                    "early_exit2": ["accuracy"],
+                    "early_exit3": ["accuracy"],
+                    "early_exit4": ["accuracy"],
+                },
+            )
+        else:
+            cnn_model = Model(inputs=[input_time, input_freq], outputs=[output])
+            cnn_model.compile(
+                loss="binary_crossentropy",
+                optimizer=SGD(learning_rate=config["learning_rate"]),
+                metrics=["accuracy"]
+            )
 
         # Configure EarlyStopping callback
         early_stopping = EarlyStopping(
@@ -165,6 +191,7 @@ if __name__ == "__main__":
         "fft_bins": 8,
         "pca_bins": 16,
         "model_time_steps": 4,
+        "preictal_class_weight": 5.0,
     }
 
     # Initialize the model

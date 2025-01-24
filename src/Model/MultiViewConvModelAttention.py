@@ -47,10 +47,20 @@ class MultiViewConvModelWithAttention:
 
     @classmethod
     def get_model(cls, config: dict):
+        """
+        Get the model architecture for the MultiViewConvModel with channel attention.
+        Args:
+            config (dict): A dictionary containing the configuration parameters.
+        Returns:
+            Model: The compiled model.
+            EarlyStopping: An EarlyStopping callback object.
+        """
         channels = config["channels"]
         pca_bins = config["pca_bins"]
         fft_bins = config["fft_bins"]
         steps = config["model_time_steps"]
+
+        use_early_exits = config.get("use_early_exits", False)
 
         # Time domain input branch
         input_time = Input(shape=(channels * pca_bins, steps, 1), name="time_domain_input")
@@ -109,13 +119,40 @@ class MultiViewConvModelWithAttention:
         output = Dense(2, activation="softmax", name="final_output")(Flatten()(merged))
 
         # Model definition
-        cnn_model = Model(inputs=[input_time, input_freq], outputs=[output, early_exit1, early_exit2, early_exit3, early_exit4])
-
-        cnn_model.compile(
-            loss="binary_crossentropy",
-            optimizer=SGD(learning_rate=config["learning_rate"]),
-            metrics=["accuracy"]
-        )
+        if use_early_exits:
+            cnn_model = Model(inputs=[input_time, input_freq], outputs=[output, early_exit1, early_exit2, early_exit3, early_exit4])
+            cnn_model.compile(
+                optimizer="adam",
+                loss={
+                    "final_output": "categorical_crossentropy",
+                    "early_exit1": "categorical_crossentropy",
+                    "early_exit2": "categorical_crossentropy",
+                    "early_exit3": "categorical_crossentropy",
+                    "early_exit4": "categorical_crossentropy",
+                },
+                # Weights for the losses of the different outputs
+                loss_weights={
+                    "final_output": 1.0,
+                    "early_exit1": 0.3,
+                    "early_exit2": 0.4,
+                    "early_exit3": 0.8,
+                    "early_exit4": 1.0,
+                },
+                metrics={
+                    "final_output": ["accuracy"],
+                    "early_exit1": ["accuracy"],
+                    "early_exit2": ["accuracy"],
+                    "early_exit3": ["accuracy"],
+                    "early_exit4": ["accuracy"],
+                },
+            )
+        else:
+            cnn_model = Model(inputs=[input_time, input_freq], outputs=[output])
+            cnn_model.compile(
+                loss="binary_crossentropy",
+                optimizer="adam",
+                metrics=["accuracy"]
+            )
 
         early_stopping = EarlyStopping(
             monitor="val_loss",

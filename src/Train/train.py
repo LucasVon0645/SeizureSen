@@ -7,10 +7,22 @@ from src.Train.ModelTrainer import ModelTrainer
 from src.Model.MultiViewConvModel import MultiViewConvModel
 from src.Model.MultiViewConvModelAttention import MultiViewConvModelWithAttention
 
+#? Change the config path to the desired model configuration
 config_path = os.path.join("models", "config", "model_without_attention_cfg.json")
-data_path = os.path.join("data", "preprocessed", "Dog_1")
+#? Change the data path to the desired preprocessed data
+data_path = os.path.join("data", "preprocessed", "Dog_1_30s_slices")
 
-trainer = ModelTrainer(cfg_path=config_path, data_directory=data_path, model_class=MultiViewConvModel)
+#? Change the model class to the desired model
+trainer = ModelTrainer(cfg_path=config_path, data_directory=data_path,
+                       model_class=MultiViewConvModel)
+
+#? Change the preprocessed filenames to the desired preprocessed data
+# preprocessed_filenames = {
+#     "freq_train": "freq_domain_train_augmented_preictal.npz",
+#     "freq_test": "freq_domain_test_augmented_preictal.npz",
+#     "time_train": "time_domain_train_augmented_preictal.npz",
+#     "time_test": "time_domain_test_augmented_preictal.npz",
+# }
 
 preprocessed_filenames = {
     "freq_train": "freq_domain_train.npz",
@@ -19,7 +31,7 @@ preprocessed_filenames = {
     "time_test": "time_domain_test.npz",
 }
 
-trainer.load_data()
+trainer.load_data(preprocessed_filenames)
 
 print("\n\nConfiguration settings")
 print(trainer.config)
@@ -33,5 +45,8 @@ print("X_test_freq: ", trainer.X_test_freq.shape)
 print("X_test_time: ", trainer.X_test_time.shape)
 print("y_test: ", trainer.y_test.shape)
 
-trainer.train(use_early_exits=False)
-trainer.evaluate(use_early_exits=False)
+# trainer.train(use_early_exits=False)
+# trainer.evaluate(use_early_exits=False)
+
+# trainer.train_with_cross_validation()
+trainer.train_full_dataset()
