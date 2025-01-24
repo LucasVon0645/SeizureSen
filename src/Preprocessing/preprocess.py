@@ -7,10 +7,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"
 
 from src.DataExtraction.DataExtractor import DataExtractor
 from src.Preprocessing.utils import (
+    augment_raw_train_slices,
     eeg_slices,
     save_preprocessed_data,
     resample_and_apply_bandpass_filter,
-    overlap,
 )
 from src.Preprocessing.Feature import Feature
 
@@ -23,15 +23,17 @@ print("Preprocessing EEG data...")
 DIR_RAW_DATA = "data"
 TEST_LABELS_FILE = "TestLabels.csv"
 SAMPLING_FREQ = 400  # New sampling frequency of EEG data in Hz
-DIR_PREPROCESSED_DATA = "data/preprocessed/Dog_1"
+DIR_PREPROCESSED_DATA = "data/preprocessed/Dog_1_30s_slices"
 SEGMENT_DURATION = 600  # Length of each segment in seconds (10 minutes)
 WINDOW_DURATION = 30  # Duration of each slice in seconds
 USE_STD_IN_TIME_DOMAIN = False
+AUGMENT_TRAINING_DATA = True # If True, augment training data by overlapping slices
+AUGMENT_ONLY_PREICTAL = True # If True, only preictal slices are augmented
 OUTPUT_FILES_NAME = {
-                    "freq_train": "freq_domain_train.npz",
-                    "freq_test": "freq_domain_test.npz",
-                    "time_train": "time_domain_train.npz",
-                    "time_test": "time_domain_test.npz",
+                    "freq_train": "freq_domain_train_augmented_preictal.npz",
+                    "freq_test": "freq_domain_test_augmented_preictal.npz",
+                    "time_train": "time_domain_train_augmented_preictal.npz",
+                    "time_test": "time_domain_test_augmented_preictal.npz",
                     }
 
 data_extractor = DataExtractor(
@@ -45,11 +47,11 @@ loaded_data = data_extractor.get_data()
 metadata = data_extractor.get_metadata()
 print("Metadata: ", metadata)
 
-train_segments = loaded_data["preictal"]+ loaded_data["interictal"]
+train_segments = loaded_data["preictal"] + loaded_data["interictal"]
 test_segments = loaded_data["test"]
 
 # Resample and apply bandpass filter to EEG data
-train_segments_filtered = []
+train_segments_filtered = [] # List of tuples (eeg_data_segment, label)
 for eeg_segment in tqdm(train_segments, desc="Filtering train segments"):
     train_segments_filtered.append(
         resample_and_apply_bandpass_filter(
@@ -58,7 +60,7 @@ for eeg_segment in tqdm(train_segments, desc="Filtering train segments"):
     )
 train_segments = train_segments_filtered
 
-test_segments_filtered = []
+test_segments_filtered = [] # List of tuples (eeg_data_segment, label)
 for eeg_segment in tqdm(test_segments, desc="Filtering test segments"):
     test_segments_filtered.append(
         resample_and_apply_bandpass_filter(
@@ -67,8 +69,6 @@ for eeg_segment in tqdm(test_segments, desc="Filtering test segments"):
     )
 test_segments = test_segments_filtered
 
-
-print(f"Selected training segments: {len(train_segments)}")
 train_slices_with_label = (
     []
 )  # To store slices for all training segments along with their labels
@@ -77,27 +77,17 @@ test_slices_with_label = (
 )  # To store slices for all test segments along with their labels
 
 # Slice the 10-minute segments into 30-second slices. A label is assigned to each slice.
-for segment in tqdm(train_segments, desc="Slicing train segments"):
-    slices = eeg_slices(segment['eeg_data'], SAMPLING_FREQ, WINDOW_DURATION)
-    train_slices_with_label.extend([(eeg_slice, segment['label']) for eeg_slice in slices])
-# Data Augmentation: Call the overlap function
-print("Applying data augmentation using overlap...")
-train_slices, train_labels = zip(*train_slices_with_label)  # Unpack slices and labels
-train_slices = np.array(train_slices)
-train_labels = np.array(train_labels)
+for eeg_data_segment, label in tqdm(train_segments, desc="Slicing train segments"):
+    slices = eeg_slices(eeg_data_segment, SAMPLING_FREQ, WINDOW_DURATION)
+    train_slices_with_label.extend([(eeg_slice, label) for eeg_slice in slices])
 
-# Call the overlap function
-train_slices_augmented, train_labels_augmented = overlap(train_slices, train_labels)
+# Augment the training data by overlapping slices
+if AUGMENT_TRAINING_DATA:
+    train_slices_with_label = augment_raw_train_slices(train_slices_with_label, AUGMENT_ONLY_PREICTAL)
 
-# Repack the augmented data
-train_slices_with_label = list(zip(train_slices_augmented, train_labels_augmented))
-
-print(f"Original training samples: {len(train_labels)}")
-print(f"Augmented training samples: {len(train_labels_augmented)}")
-
-for segment in tqdm(test_segments, desc="Slicing test segments"):
-    slices = eeg_slices(segment['eeg_data'], SAMPLING_FREQ, WINDOW_DURATION)
-    test_slices_with_label.extend([(eeg_slice, segment['label']) for eeg_slice in slices])
+for eeg_data_segment, label in tqdm(test_segments, desc="Slicing test segments"):
+    slices = eeg_slices(eeg_data_segment, SAMPLING_FREQ, WINDOW_DURATION)
+    test_slices_with_label.extend([(eeg_slice, label) for eeg_slice in slices])
 
 print(f"Number of slices for training: {len(train_slices_with_label)}")
 print(f"Number of slices for testing: {len(test_slices_with_label)}")
@@ -122,7 +112,7 @@ print("Shape of y_time_train:", y_time_train.shape)
 
 print("Saving preprocessed training data in time domain...")
 save_preprocessed_data(
-    directory="data/preprocessed/Dog_1",
+    directory=DIR_PREPROCESSED_DATA,
     filename=OUTPUT_FILES_NAME["time_train"],
     X=X_time_train,
     y=y_time_train,
@@ -146,7 +136,7 @@ print("Shape of y_freq_train:", y_freq_train.shape)
 
 print("Saving preprocessed training data in frequency domain...")
 save_preprocessed_data(
-    directory="data/preprocessed/Dog_1",
+    directory=DIR_PREPROCESSED_DATA,
     filename=OUTPUT_FILES_NAME["freq_train"],
     X=X_freq_train,
     y=y_freq_train,
@@ -170,7 +160,7 @@ print("Shape of y_time_test:", y_time_test.shape)
 
 print("Saving preprocessed test data in time domain...")
 save_preprocessed_data(
-    directory="data/preprocessed/Dog_1",
+    directory=DIR_PREPROCESSED_DATA,
     filename=OUTPUT_FILES_NAME["time_test"],
     X=X_time_test,
     y=y_time_test,
@@ -194,7 +184,7 @@ print("Shape of y_freq_test:", y_freq_test.shape)
 
 print("Saving preprocessed test data in frequency domain...")
 save_preprocessed_data(
-    directory="data/preprocessed/Dog_1",
+    directory=DIR_PREPROCESSED_DATA,
     filename=OUTPUT_FILES_NAME["freq_test"],
     X=X_freq_test,
     y=y_freq_test,

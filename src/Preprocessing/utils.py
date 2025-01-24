@@ -28,7 +28,7 @@ def eeg_slices(eeg_data, sampling_freq, window_duration):
     return slices
 
 
-def overlap(x, y):
+def overlap(x, y, only_class_1=False):
     """
     Used to enhance imbalanced data by combining the first half and the second half of different samples
     to generate new samples.
@@ -57,14 +57,15 @@ def overlap(x, y):
     tmp_x = []
     tmp_y = []
 
-    # Augment samples with label 0
-    for i in range(len(zero_indices) - 1):
-        tmp = np.concatenate(
-            (x[zero_indices[i], :, :first_part], x[zero_indices[i + 1], :, first_part:]),
-            axis=1
-        )
-        tmp_x.append(tmp)
-        tmp_y.append(0)
+    if not only_class_1:
+        # Augment samples with label 0
+        for i in range(len(zero_indices) - 1):
+            tmp = np.concatenate(
+                (x[zero_indices[i], :, :first_part], x[zero_indices[i + 1], :, first_part:]),
+                axis=1
+            )
+            tmp_x.append(tmp)
+            tmp_y.append(0)
 
     # Augment samples with label 1
     for i in range(len(one_indices) - 1):
@@ -286,7 +287,7 @@ def butterworth_bandpass_filter(eeg_segment=np.ndarray, order=int, band=None, sa
     return scipy.signal.lfilter(b, a, eeg_segment, axis=1)
 
 
-def resample_and_apply_bandpass_filter(eeg_segment, order=5, band=None, new_sampling_freq=400, time_length=600):
+def resample_and_apply_bandpass_filter(eeg_segment, order=5, band=None, new_sampling_freq=400, time_length=600) -> tuple[np.ndarray, int]:
     """
     Resamples the given EEG data to a new sampling rate and applies a Butterworth bandpass filter.
 
@@ -361,12 +362,14 @@ def transform_to_tensor(features: list[dict], labels: list[int], steps: int) -> 
 
     # Ensure the total number of slices is divisible by steps
     total_slices = all_slices.shape[0]
-    if total_slices % steps != 0:
-        raise ValueError(
-            "The total number of slices must be divisible by the number of steps."
-        )
-
     n_samples = total_slices // steps  # Number of sample slots
+
+    # Ensure the total number of slices is divisible by steps
+    excess_slices = total_slices % steps
+    if excess_slices != 0:
+        print(f"Warning: Discarding {excess_slices} excess slices.")
+        all_slices = all_slices[:-excess_slices]
+        labels = labels[:-excess_slices]
 
     # Reshape into (n_samples, steps, n_channels, features)
     reshaped_slices = tf.reshape(all_slices, (n_samples, steps, n_channels, -1))
@@ -429,3 +432,34 @@ def scale_across_time_tf(data: tf.Tensor, scalers: list[dict]) -> tf.Tensor:
     scaled_data = tf.stack(scaled_data.stack(), axis=1)
 
     return scaled_data
+
+def augment_raw_train_slices(train_slices_with_label: list[tuple[np.ndarray, int]], only_class_1 = False) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Augment the raw training slices using the overlap technique.
+    Parameters:
+        train_slices_with_label: list of tuples
+            A list of tuples containing the raw training slices and their corresponding labels.
+    Returns:
+        train_slices_with_label_augmented: list of tuples
+            A list of tuples containing the augmented training slices and their corresponding labels.
+    """
+    
+    # Data Augmentation: Call the overlap function
+    print("Applying data augmentation in training data using overlap...")
+    if only_class_1:
+        print("Augmenting only class 1 samples...")
+
+    train_slices, train_labels = zip(*train_slices_with_label)  # Unpack slices and labels
+    train_slices = np.array(train_slices)
+    train_labels = np.array(train_labels)
+    
+    # Call the overlap function
+    train_slices_augmented, train_labels_augmented = overlap(train_slices, train_labels, only_class_1)
+
+    # Repack the augmented data
+    train_slices_with_label_augmented = list(zip(train_slices_augmented, train_labels_augmented))
+    
+    print(f"Original training samples: {len(train_slices_with_label)}")
+    print(f"Augmented training samples: {len(train_slices_with_label_augmented)}")
+    
+    return train_slices_with_label_augmented
