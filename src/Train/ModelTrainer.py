@@ -890,7 +890,7 @@ class ModelTrainer:
         Returns:
             None
         """
-        if weights_path is not None and scalers_path is not None:
+        if weights_path is None and scalers_path is None:
             self.model = load_model_from_config(self.config, self.model_class)
             self.load_scalers()
         else:

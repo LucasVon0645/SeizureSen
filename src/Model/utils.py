@@ -7,8 +7,6 @@ from keras.api.models import Model
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from src.Model.MultiViewConvModel import MultiViewConvModel
-
 
 def load_model_from_config(config: dict, class_model) -> Model:
     """
@@ -65,7 +63,9 @@ def load_scalers_from_config(config: dict) -> tuple[list[dict], list[dict]]:
     # Access the time domain and frequency domain scalers
     scalers_time = scalers["time_domain"]
     scalers_freq = scalers["frequency_domain"]
-
+    
+    print("Scalers loaded successfully from ", filepath)
+    
     return scalers_time, scalers_freq
 
 def load_config(config_path) -> Optional[dict]:
