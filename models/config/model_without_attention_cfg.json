@@ -11,8 +11,9 @@
 	"nn_freq_output": 64,
     "batch_size": 64,
     "nb_epoch": 10,
-    "preictal_class_weight": 8,
     "use_early_exits": false,
+    "augmentation_strategy": "SMOTE",
+    "preictal_class_weight": null,
 	"name": "model_without_attention_5s_slices",
-    "model_path": "models\\model_without_attention_aug_preictal_5s_slices"
+    "model_path": "models\\model_without_attention_smote_5s_slices"
 }
