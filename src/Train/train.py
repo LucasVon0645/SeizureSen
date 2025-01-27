@@ -10,7 +10,7 @@ from src.Model.MultiViewConvModelAttention import MultiViewConvModelWithAttentio
 #? Change the config path to the desired model configuration
 config_path = os.path.join("models", "config", "model_without_attention_cfg.json")
 #? Change the data path to the desired preprocessed data
-data_path = os.path.join("data", "preprocessed", "Dog_1_30s_slices")
+data_path = os.path.join("data", "preprocessed", "Dog_1_5s_slices")
 
 #? Change the model class to the desired model
 trainer = ModelTrainer(cfg_path=config_path, data_directory=data_path,
@@ -45,8 +45,8 @@ print("X_test_freq: ", trainer.X_test_freq.shape)
 print("X_test_time: ", trainer.X_test_time.shape)
 print("y_test: ", trainer.y_test.shape)
 
-# trainer.train(use_early_exits=False)
-# trainer.evaluate(use_early_exits=False)
+trainer.train()
+trainer.evaluate(save_test_pred=True)
 
-# trainer.train_with_cross_validation()
-trainer.train_full_dataset()
+trainer.train_with_cross_validation()
+trainer.train_full_dataset(save_test_pred=True)

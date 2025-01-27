@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import joblib
@@ -7,12 +8,14 @@ import matplotlib
 
 from sklearn.metrics import classification_report, accuracy_score
 from sklearn.model_selection import train_test_split, StratifiedKFold
+from imblearn.over_sampling import SMOTE, ADASYN
 
 import tensorflow as tf
 from keras.api.utils import to_categorical, plot_model
 from keras.api.models import Model
 from keras.api.callbacks import ModelCheckpoint
 from typing import Optional
+from numpy import ndarray
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
@@ -20,6 +23,8 @@ from src.Train.utils import (
     plot_training_history,
     save_confusion_matrix,
     save_model_scores,
+    plot_roc_curve,
+    print_and_save_cross_validation_results
 )
 from src.Preprocessing.utils import (
     load_preprocessed_data,
@@ -70,6 +75,9 @@ class ModelTrainer:
         # One dictionary per channel
         self.scalers_time: Optional[list[dict]] = None
         self.scalers_freq: Optional[list[dict]] = None
+        
+        self.augmentation_strategy = self.config.get("augmentation_strategy", None)
+        self.preictal_class_weight = self.config.get("preictal_class_weight", None)
 
         matplotlib.use(
             "Agg"
@@ -78,6 +86,8 @@ class ModelTrainer:
         model_path = self.config["model_path"]
 
         os.makedirs(model_path, exist_ok=True)
+        
+        self._save_model_config()
 
     def load_data(self, file_names_dict: Optional[dict] = None):
 
@@ -219,13 +229,12 @@ class ModelTrainer:
             self.X_train_freq = scaled_data
             self.scalers_freq = scalers
 
-    def save_scalers(self):
+    def save_scalers(self, filename="feature_scalers.pkl"):
         """
         Save scalers to a file.
         """
 
         model_path = self.config["model_path"]
-        filename = "feature_scalers.pkl"
 
         filepath = os.path.join(model_path, filename)
 
@@ -237,11 +246,65 @@ class ModelTrainer:
         # Save the dictionary to a file using joblib
         joblib.dump(scalers, filepath)
 
-    #! implement the augment_train_data method
-    def augment_train_data(self):
-        pass
+    def augment_train_data(self, X_train_time: ndarray, X_train_freq: ndarray, y_train: ndarray, strategy="SMOTE"):
+        """
+        Augment the training data using SMOTE or ADASYN.
+        This method augments the preictal data using the specified strategy
+        (either SMOTE or ADASYN) to balance the class distribution.
+        The augmented data is reshaped back to the original dimensions.
+        Parameters:
+            - strategy (str): The strategy to use for data augmentation.
+                              Either 'SMOTE' or 'ADASYN'.
+        Returns:
+            - X_train_time_resampled (np.ndarray): The resampled time domain data.
+            - X_train_freq_resampled (np.ndarray): The resampled frequency domain data.
+            - y_train_resampled (np.ndarray): The resampled labels.
+        """
+        print("\n\nInitial shape of the training data (X_time, X_freq, y): ", X_train_time.shape, X_train_freq.shape, y_train.shape)
+        print("\n\nOriginal training data class distribution:")
+        print(pd.Series(y_train).map({0: "interictal", 1: "preictal"}).value_counts())
 
-    def train(self, use_early_exits=False):
+        # Check shapes of input arrays
+        assert X_train_freq.shape[0] == X_train_time.shape[0] == y_train.shape[0], (
+            "X_train_freq, X_train_time, and y_train must have the same number of samples."
+        )
+        assert strategy in ["SMOTE", "ADASYN"], (
+            f"Invalid strategy '{strategy}'. Choose 'SMOTE' or 'ADASYN'."
+        )
+
+        # Reshape data for SMOTE
+        X_train_freq_reshaped = X_train_freq.reshape((X_train_freq.shape[0], -1))
+        X_train_time_reshaped = X_train_time.reshape((X_train_time.shape[0], -1))
+
+        # Get the number of features in the frequency domain data after reshaping
+        num_features_in_X_train_freq = X_train_freq_reshaped.shape[1]
+
+        # Combine the time and frequency domain data
+        # Rows represent samples and columns represent features
+        X_train_combined = np.concatenate((X_train_freq_reshaped, X_train_time_reshaped), axis=1)
+
+        if strategy == "ADASYN":
+            print("\n\nApplying ADASYN to augment the preictal data...")
+            # Apply ADASYN to augment the preictal data
+            adasyn = ADASYN(sampling_strategy='minority', random_state=42)
+            X_train_resampled, y_train_resampled = adasyn.fit_resample(X_train_combined, y_train)
+        else:
+            print("\n\nApplying SMOTE to augment the preictal data...")
+            # Apply SMOTE to augment the preictal data
+            smote = SMOTE(sampling_strategy='minority', random_state=42)
+            X_train_resampled, y_train_resampled = smote.fit_resample(X_train_combined, y_train)
+
+        # Reshape the resampled data back to the original dimensions, separating the freq and time features
+        X_train_freq_resampled = X_train_resampled[:, :num_features_in_X_train_freq]
+        X_train_time_resampled = X_train_resampled[:, num_features_in_X_train_freq:]
+
+        # Reshape back to original dimensions        
+        X_train_freq_resampled = X_train_freq_resampled.reshape((-1, *X_train_freq.shape[1:]))
+        X_train_time_resampled = X_train_time_resampled.reshape((-1, *X_train_time.shape[1:]))
+
+        return X_train_time_resampled, X_train_freq_resampled, y_train_resampled
+
+    def train(self):
         """
         Train the multi-view convolutional neural network model.
         This method trains and validates the model using the training data.
@@ -249,6 +312,9 @@ class ModelTrainer:
         in the configuration settings.
         The best model is saved to a file using the ModelCheckpoint callback in a directory
         "checkpoint" within the model directory specified in the configuration.
+        
+        Parameters:
+        - augmentation_strategy: Data augmentation strategy to use. Default is None (No augmentation). Possible values are "SMOTE" and "ADASYN".
         """
 
         print("\n\nTraining the model...")
@@ -268,7 +334,7 @@ class ModelTrainer:
             or self.y_train is None
         ):
             raise ValueError("Training data is missing!")
-
+        
         X_fft = self.X_train_freq
         X_pca = self.X_train_time
         y = self.y_train
@@ -298,6 +364,10 @@ class ModelTrainer:
                 shuffle=True,
             )
         )
+        
+        # Augment the training data if a strategy is provided
+        if self.augmentation_strategy is not None:
+            X_pca_train, X_fft_train, y_train = self.augment_train_data(X_pca_train, X_fft_train, y_train, self.augmentation_strategy)
 
         # Print the class distribution for the training
         train_dist = (
@@ -331,8 +401,8 @@ class ModelTrainer:
 
         self.model = multi_view_conv_model
 
+        use_early_exits = config.get("use_early_exits", False)
 
-        print("Fitting the model...")
         print("Final output shape:", multi_view_conv_model.output[0].shape)
 
         fit_args = {
@@ -364,8 +434,11 @@ class ModelTrainer:
             })
         else:
             fit_args["y"] = y_train
-            fit_args["class_weight"] = {0: 1.0, 1: config["preictal_class_weight"]}
+            if self.preictal_class_weight is not None:
+                print("Using class weights for the preictal class: ", config["preictal_class_weight"])
+                fit_args["class_weight"] = {0: 1.0, 1: config["preictal_class_weight"]}
 
+        print("Fitting the model...")
         history = multi_view_conv_model.fit(**fit_args)
 
         print("\n\nTraining completed!")
@@ -397,9 +470,12 @@ class ModelTrainer:
         y_pred = multi_view_conv_model.predict(
             {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val}
         )
+        
+        if use_early_exits:
+            y_pred = y_pred[0]
 
         # Get the classification report for the validation data and save it
-        self._get_classification_report(y_val, y_pred, use_early_exits, suffix="val")
+        self._get_classification_report(y_val, y_pred, suffix="val")
 
         # Save the training history
         plot_training_history(history, config["model_path"])
@@ -416,7 +492,7 @@ class ModelTrainer:
             show_layer_activations=True,
         )
 
-    def train_fold(self, X_fft_train, X_fft_val, X_pca_train, X_pca_val, y_train, y_val, fold_index):
+    def train_fold(self, X_fft_train: ndarray, X_fft_val: ndarray, X_pca_train: ndarray, X_pca_val: ndarray, y_train: ndarray, y_val: ndarray, fold_index):
         """
         Train the model on a single fold.
 
@@ -426,47 +502,73 @@ class ModelTrainer:
         - y_train, y_val: Training and validation labels.
         - config: Configuration dictionary.
         - fold_index: Fold index for saving checkpoints and logging.
+        - augmentation_strategy: Data augmentation strategy to use. Default is None (No augmentation). Possible values are "SMOTE" and "ADASYN".
 
         Returns:
         - model: The trained model.
         - metrics: Dictionary containing metrics for the fold.
         """
+        config = self.config
+        use_early_exits = config.get("use_early_exits", False)
+        
+        # Augment the training data if a strategy is provided
+        if self.augmentation_strategy is not None:
+            X_pca_train, X_fft_train, y_train = self.augment_train_data(X_pca_train, X_fft_train, y_train, self.augmentation_strategy)
+        
+        print(f"Distribution of the training data after augmentation in folder {fold_index}:")
+        print(pd.Series(y_train).map({0: "interictal", 1: "preictal"}).value_counts())
 
         # Convert target labels to categorical
         y_train = to_categorical(y_train, num_classes=2).astype("float32")
         y_val = to_categorical(y_val, num_classes=2).astype("float32")
 
-        # Set up checkpoint path
-        checkpoint_path = os.path.join(
-            self.config["model_path"], f"checkpoint_fold_{fold_index}", "best_model.keras"
-        )
-        os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
-        checkpoint = ModelCheckpoint(
-            checkpoint_path, monitor="val_loss", save_best_only=True, verbose=1
-        )
-
         # Get model and callbacks
         model, early_stopping = self.model_class.get_model(self.config)
-
-        # Train the model
-        model.fit(
-            {"time_domain_input": X_pca_train, "freq_domain_input": X_fft_train},
-            y_train,
-            validation_data=(
-                {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val},
-                {"final_output": y_val},
+        
+        fit_args = {
+            "x": {"time_domain_input": X_pca_train, "freq_domain_input": X_fft_train},
+            "validation_data": (
+            {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val},
+            {"final_output": y_val},
             ),
-            epochs=self.config["nb_epoch"],
-            verbose=1,
-            batch_size=self.config["batch_size"],
-            callbacks=[early_stopping, checkpoint],
-            class_weight={0: 1.0, 1: self.config["preictal_class_weight"]},  # Higher weight for minority class
-        )
+            "epochs": config["nb_epoch"],
+            "verbose": 1,
+            "batch_size": config["batch_size"],
+            "callbacks": [early_stopping],
+        }
+
+        if use_early_exits:
+            print("Early exits shape:", [output.shape for output in model.outputs[1:]])
+            fit_args["y"] = {
+            "final_output": y_train,
+            "early_exit1": y_train,
+            "early_exit2": y_train,
+            "early_exit3": y_train,
+            "early_exit4": y_train,
+            }
+            fit_args["validation_data"][1].update({
+            "early_exit1": y_val,
+            "early_exit2": y_val,
+            "early_exit3": y_val,
+            "early_exit4": y_val,
+            })
+        else:
+            fit_args["y"] = y_train
+            if self.preictal_class_weight is not None:
+                print("Using class weights for the preictal class: ", config["preictal_class_weight"])
+                fit_args["class_weight"] = {0: 1.0, 1: config["preictal_class_weight"]}
+
+        print(f"Fitting the model in folder {fold_index}...")
+        model.fit(**fit_args)
 
         # Generate predictions for the validation set
         y_val_pred = model.predict(
             {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val}
         )
+        
+        if use_early_exits:
+            y_val_pred = y_val_pred[0]
+        
         y_val_pred = np.argmax(y_val_pred, axis=1)
         y_val_true = np.argmax(y_val, axis=1)
 
@@ -488,7 +590,6 @@ class ModelTrainer:
 
         print("\n\nTraining the model with stratified cross-validation...")
         self._validate_input(train=True)
-        self.augment_train_data()
 
         # Compute and scale train data
         self.compute_scalers_transform(time_domain=True)
@@ -525,61 +626,18 @@ class ModelTrainer:
             print(pd.Series(y_train).value_counts())
 
             _, metrics = self.train_fold(
-                X_fft_train, X_fft_val, X_pca_train, X_pca_val, y_train, y_val, fold_index
+                X_fft_train, X_fft_val,
+                X_pca_train, X_pca_val,
+                y_train, y_val,
+                fold_index
             )
+            
             all_metrics.append(metrics)
 
         # Print and save the cross-validation results
-        self.print_and_save_cross_validation_results(all_metrics)
+        print_and_save_cross_validation_results(all_metrics, self.config["model_path"])
 
-    def print_and_save_cross_validation_results(self, all_metrics: dict, filename="cross_validation_results.txt"):
-        """
-        Print the average metrics from cross-validation.
-
-        Parameters:
-        - all_metrics: List of classification reports for each fold.
-        - filename: Name of the file to save the results.
-        """
-        
-        metrics_to_print = {
-            "accuracy": "Average Accuracy",
-            "interictal_precision": "Average Precision (Interictal)",
-            "interictal_recall": "Average Recall (Interictal)",
-            "interictal_f1-score": "Average F1-Score (Interictal)",
-            "preictal_precision": "Average Precision (Preictal)",
-            "preictal_recall": "Average Recall (Preictal)",
-            "preictal_f1-score": "Average F1-Score (Preictal)",
-        }
-
-        avg_metrics = {
-            "accuracy": np.mean([metrics["accuracy"] for metrics in all_metrics]),
-            "interictal_precision": np.mean(
-            [metrics["interictal"]["precision"] for metrics in all_metrics]
-            ),
-            "interictal_recall": np.mean(
-            [metrics["interictal"]["recall"] for metrics in all_metrics]
-            ),
-            "interictal_f1-score": np.mean(
-            [metrics["interictal"]["f1-score"] for metrics in all_metrics]
-            ),
-            "preictal_precision": np.mean(
-            [metrics["preictal"]["precision"] for metrics in all_metrics]
-            ),
-            "preictal_recall": np.mean(
-            [metrics["preictal"]["recall"] for metrics in all_metrics]
-            ),
-            "preictal_f1-score": np.mean(
-            [metrics["preictal"]["f1-score"] for metrics in all_metrics]
-            ),
-        }
-
-        print("\n\nCross-Validation Results:")
-        with open(os.path.join(self.config["model_path"], filename), "w", encoding="utf-8") as f:
-            for key, description in metrics_to_print.items():
-                print(f"{description}: {avg_metrics[key]:.4f}")
-                f.write(f"{description}: {avg_metrics[key]:.4f}\n")
-
-    def evaluate(self, use_early_exits=False):
+    def evaluate(self, save_test_pred = False):
         """
         Evaluate the multi-view convolutional neural network model.
         This method evaluates the model using the test data.
@@ -625,13 +683,22 @@ class ModelTrainer:
         y_pred = multi_view_conv_model.predict(
             {"time_domain_input": X_pca, "freq_domain_input": X_fft}
         )
+        
+        if use_early_exits:
+            y_pred = y_pred[0]
 
         # Get the classification report for the test data and save it
-        self._get_classification_report(y_test, y_pred, use_early_exits, suffix="eval")
+        self._get_classification_report(y_test, y_pred, suffix="eval")
+        
+        plot_roc_curve(y_test, y_pred, config["model_path"], "roc_curve_eval.png")
+        
+        if save_test_pred:
+            # Save the model predictions
+            self._save_predictions_to_file(y_pred, y_test, file_name="predictions_eval.csv")
 
         print("\nEvaluation completed!")
 
-    def train_full_dataset(self):
+    def train_full_dataset(self, save_test_pred = False):
         """
         Train the multi-view convolutional neural network model.
         This method trains and validates the model using the training data.
@@ -675,8 +742,12 @@ class ModelTrainer:
         # Reshape inputs for the model
         # The last dimension of the input shape is 1 because the input data
         # is single-channel (like grayscale image)
-        X_fft_train = tf.reshape(X_fft_train, [n_samples_train, channels * fft_bins, steps, 1])
-        X_pca_train = tf.reshape(X_pca_train, [n_samples_train, channels * pca_bins, steps, 1])
+        X_fft_train = tf.reshape(X_fft_train, [n_samples_train, channels * fft_bins, steps, 1]).numpy()
+        X_pca_train = tf.reshape(X_pca_train, [n_samples_train, channels * pca_bins, steps, 1]).numpy()
+        y_train = y_train.numpy()
+        
+        if self.augmentation_strategy is not None:
+            X_pca_train, X_fft_train, y_train = self.augment_train_data(X_pca_train, X_fft_train, y_train, self.augmentation_strategy)
 
         # Scale the test data using the scalers learned from the training data
         X_fft_val = scale_across_time_tf(self.X_test_freq, self.scalers_freq)
@@ -685,31 +756,28 @@ class ModelTrainer:
         
         n_samples_test = X_fft_val.shape[0]
         
-        X_fft_val = tf.reshape(X_fft_val, [n_samples_test, channels * fft_bins, steps, 1])
-        X_pca_val = tf.reshape(X_pca_val, [n_samples_test, channels * pca_bins, steps, 1])
-
+        X_fft_val = tf.reshape(X_fft_val, [n_samples_test, channels * fft_bins, steps, 1]).numpy()
+        X_pca_val = tf.reshape(X_pca_val, [n_samples_test, channels * pca_bins, steps, 1]).numpy()
+        y_val = y_val.numpy()
+    
         # Print the class distribution for the training
-        train_dist = (
-            pd.Series(y_train).map({0: "interictal", 1: "preictal"}).value_counts()
-        )
         print("\n\nTraining data class distribution:")
-        print(train_dist)
+        print(pd.Series(y_train).map({0: "interictal", 1: "preictal"}).value_counts())
         # Print the class distribution for the validation
-        val_dist = pd.Series(y_val).map({0: "interictal", 1: "preictal"}).value_counts()
         print("\n\nValidation data class distribution:")
-        print(val_dist, "\n\n")
+        print(pd.Series(y_val).map({0: "interictal", 1: "preictal"}).value_counts(), "\n\n")
 
         # Convert the target labels to categorical, as it's a classification task
         # The labels are one-hot encoded (e.g., [0, 1] for preictal and [1, 0] for interictal)
-        y_train = to_categorical(y_train, num_classes=2).numpy()
-        y_val = to_categorical(y_val, num_classes=2).numpy()
+        y_train = to_categorical(y_train, num_classes=2)
+        y_val = to_categorical(y_val, num_classes=2)
 
         y_train = y_train.astype("float32")
         y_val = y_val.astype("float32")
 
         # Add model checkpoint callback to automatically save the best model
         model_path = self.config["model_path"]
-        checkpoint_path = os.path.join(model_path, "checkpoint", "best_model.keras")
+        checkpoint_path = os.path.join(model_path, "checkpoint_full_dataset", "best_model.keras")
         os.makedirs(os.path.dirname(checkpoint_path), exist_ok=True)
         checkpoint = ModelCheckpoint(
             checkpoint_path, monitor="val_loss", save_best_only=True, verbose=1
@@ -720,8 +788,6 @@ class ModelTrainer:
 
         self.model = multi_view_conv_model
 
-
-        print("Fitting the model...")
         print("Final output shape:", multi_view_conv_model.output[0].shape)
 
         fit_args = {
@@ -753,14 +819,17 @@ class ModelTrainer:
             })
         else:
             fit_args["y"] = y_train
-            fit_args["class_weight"] = {0: 1.0, 1: config["preictal_class_weight"]}
+            if self.preictal_class_weight is not None:
+                print("Using class weights for the preictal class: ", config["preictal_class_weight"])
+                fit_args["class_weight"] = {0: 1.0, 1: config["preictal_class_weight"]}
 
+        print("Fitting the model...")
         history = multi_view_conv_model.fit(**fit_args)
 
         print("\n\nTraining completed!")
 
         # Save the scalers to a file
-        self.save_scalers()
+        self.save_scalers("feature_scalers_full_dataset.pkl")
 
         print("\nTrain Loss over epochs: ", history.history["loss"])
 
@@ -784,12 +853,21 @@ class ModelTrainer:
         y_pred = multi_view_conv_model.predict(
             {"time_domain_input": X_pca_val, "freq_domain_input": X_fft_val}
         )
+        
+        if use_early_exits:
+            y_pred = y_pred[0]
+        
+        if save_test_pred:
+            # Save the model predictions
+            self._save_predictions_to_file(y_pred, y_val, file_name="test_prediction_full_dataset.csv")
 
         # Get the classification report for the validation data and save it
-        self._get_classification_report(y_val, y_pred, use_early_exits, suffix="val")
+        self._get_classification_report(y_val, y_pred, "eval_full_dataset")
+
+        plot_roc_curve(y_val, y_pred, config["model_path"], "roc_curve_full_dataset_eval.png")
 
         # Save the training history
-        plot_training_history(history, config["model_path"])
+        plot_training_history(history, config["model_path"], suffix="_full_dataset")
 
         # Uncomment the two following lines only if you have graphviz installed!
         filepath = os.path.join(
@@ -803,7 +881,7 @@ class ModelTrainer:
             show_layer_activations=True,
         )
 
-    def load_model(self):
+    def load_model(self,  weights_path = None, scalers_path = None):
         """
         Loads the machine learning model based on the provided configuration.
         This method initializes the model by loading it from the configuration
@@ -812,9 +890,18 @@ class ModelTrainer:
         Returns:
             None
         """
-
-        self.model = load_model_from_config(self.config)
-        self.load_scalers()
+        if weights_path is not None and scalers_path is not None:
+            self.model = load_model_from_config(self.config, self.model_class)
+            self.load_scalers()
+        else:
+            self.model, _ = self.model_class.get_model(self.config)
+            self.model.load_weights(weights_path)
+            
+             # Load the scalers from the file
+            scalers = joblib.load(scalers_path)
+            # Access the time domain and frequency domain scalers
+            self.scalers_time = scalers["time_domain"]
+            self.scalers_freq = scalers["frequency_domain"]
 
     def _validate_input(self, train=True):
         """
@@ -911,7 +998,7 @@ class ModelTrainer:
                 )
 
     def _get_classification_report(
-        self, y_true, y_pred, early_exits_used=False, suffix=""
+        self, y_true: ndarray, y_pred: ndarray, suffix=""
     ):
         """
         Get the classification report for the model.
@@ -922,12 +1009,8 @@ class ModelTrainer:
             suffix (str): The suffix to add to the file name.
         """
         # Binarize predictions (e.g., threshold = 0.5 for binary classification)
-        if early_exits_used:
-            # Only the final_output is considered for the classification report
-            y_pred_final = y_pred[0]
-            y_pred_classes = (y_pred_final[:, 1] > 0.5).astype(int)
-        else:
-            y_pred_classes = (y_pred[:, 1] > 0.5).astype(int)
+        y_pred_prob = y_pred[:, 1]
+        y_pred_classes = (y_pred_prob > 0.5).astype(int)
 
         # Binarize true labels (e.g., threshold = 0.5 for binary classification)
         y_true_classes = y_true[:, 1].astype(int)
@@ -953,3 +1036,52 @@ class ModelTrainer:
             y_pred_classes,
             os.path.join(model_path, filename),
         )
+
+    def _save_model_config(self):
+        """
+        Save the model configuration to a file.
+        """
+        model_path = self.config["model_path"]
+        filename = "model_config.json"
+
+        filepath = os.path.join(model_path, filename)
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(self.config, f, indent=4)
+
+    def _save_predictions_to_file(self, y_pred: ndarray, y_test: ndarray, file_name):
+        """
+        Save a DataFrame with predicted labels, true labels, and prediction probabilities for the 'preictal' class.
+
+        Parameters:
+        - y_pred (ndarray): Array with predicted probabilities for each class (shape: [n_samples, n_classes]).
+        - y_test (ndarray): One-hot encoded array of true labels (shape: [n_samples, n_classes]).
+        - file_name (str): Name of the file where the DataFrame will be saved.
+
+        Returns:
+        - None
+        """
+        # Determine predicted labels
+        pred_labels = np.argmax(y_pred, axis=1)
+
+        # Get the true labels from one-hot encoding
+        true_labels = np.argmax(y_test, axis=1)
+
+        # Get predicted probabilities for the 'preictal' class (assuming it's class 1)
+        if isinstance(y_pred, list):
+            y_pred = y_pred[0]
+        
+        pred_prob_preictal = y_pred[:, 1]
+
+        # Create the DataFrame
+        results_df = pd.DataFrame({
+            "pred_label": pred_labels,
+            "true_label": true_labels,
+            "pred_prob_preictal": pred_prob_preictal
+        })
+
+        filepath = os.path.join(self.config["model_path"], file_name)
+
+        # Save to a text file
+        results_df.to_csv(filepath, sep=';', index=False)
+        print(f"Predictions saved to {file_name}")

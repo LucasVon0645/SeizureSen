@@ -10,13 +10,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"
 from src.Model.MultiViewConvModel import MultiViewConvModel
 
 
-def load_model_from_config(config: dict) -> Model:
+def load_model_from_config(config: dict, class_model) -> Model:
     """
     Load a pre-trained model from a configuration dictionary.
     Args:
         config (dict): A dictionary containing configuration parameters.
                        It must include the key "model_path" which specifies
                        the directory where the model checkpoint is stored.
+        class_model (class): The class of the model to be loaded.
     Returns:
         Model: The loaded model with weights restored from the checkpoint.
     Raises:
@@ -28,7 +29,7 @@ def load_model_from_config(config: dict) -> Model:
     filename = "best_model.keras"
     filepath = os.path.join(model_path, "checkpoint", filename)
 
-    model, _ = MultiViewConvModel.get_model(config)
+    model, _ = class_model.get_model(config)
 
     model.load_weights(filepath)
 
@@ -91,6 +92,8 @@ def load_config(config_path) -> Optional[dict]:
         "fft_bins": int,
         "pca_bins": int,
         "preictal_class_weight": float,
+        "use_early_exits": bool,
+        "augmentation_strategy": "SMOTE" | "ADASYN" | null,
         
     }
     Obs.: model_path is the relative path from the project root.
