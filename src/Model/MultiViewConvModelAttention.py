@@ -22,7 +22,7 @@ def channel_attention(input_feature, ratio=8):
     channel = input_feature.shape[-1]
 
     shared_dense_one = Dense(channel // ratio, activation='relu', use_bias=True, kernel_initializer='he_normal')
-    shared_dense_two = Dense(channel, activation='sigmoid', use_bias=True, kernel_initializer='he_normal')
+    shared_dense_two = Dense(channel, activation=None, use_bias=True, kernel_initializer='he_normal')
 
     avg_pool = GlobalAveragePooling2D()(input_feature)
     avg_pool = Reshape((1, 1, channel))(avg_pool)
@@ -71,14 +71,14 @@ class MultiViewConvModelWithAttention:
         seq1 = channel_attention(seq1)
         seq1 = Dropout(config["dropout"], name="time_dropout_layer1")(seq1)
 
-        early_exit1 = Dense(2, activation="sigmoid", name="early_exit1")(Flatten()(seq1))
+        early_exit1 = Dense(2, activation="softmax", name="early_exit1")(Flatten()(seq1))
 
         seq1 = Conv2D(filters=config["nb_filter"], kernel_size=(1, 3),
                       kernel_regularizer=L2(config["l2"]),
                       kernel_initializer="lecun_uniform",
                       activation="relu", name="time_conv_layer2")(seq1)
         seq1 = Dropout(config["dropout"], name="time_dropout_layer2")(seq1)
-        early_exit2 = Dense(2, activation="sigmoid", name="early_exit2")(Flatten()(seq1))
+        early_exit2 = Dense(2, activation="softmax", name="early_exit2")(Flatten()(seq1))
 
         seq1 = Flatten(name="time_flatten_layer")(seq1)
         output1 = Dense(config["nn_time_output"], activation="tanh", name="cnn_time_output")(seq1)
@@ -92,14 +92,14 @@ class MultiViewConvModelWithAttention:
         seq2 = channel_attention(seq2)
         seq2 = Dropout(config["dropout"], name="freq_dropout_layer1")(seq2)
 
-        early_exit3 = Dense(2, activation="sigmoid", name="early_exit3")(Flatten()(seq2))
+        early_exit3 = Dense(2, activation="softmax", name="early_exit3")(Flatten()(seq2))
 
         seq2 = Conv2D(filters=config["nb_filter"], kernel_size=(1, 3),
                       kernel_regularizer=L2(config["l2"]),
                       kernel_initializer="lecun_uniform",
                       activation="relu", name="freq_conv_layer2")(seq2)
         seq2 = Dropout(config["dropout"], name="freq_dropout_layer2")(seq2)
-        early_exit4 = Dense(2, activation="sigmoid", name="early_exit4")(Flatten()(seq2))
+        early_exit4 = Dense(2, activation="softmax", name="early_exit4")(Flatten()(seq2))
 
         seq2 = Flatten(name="freq_flatten_layer")(seq2)
         output2 = Dense(config["nn_freq_output"], activation="tanh", name="cnn_freq_output")(seq2)
@@ -149,7 +149,7 @@ class MultiViewConvModelWithAttention:
         else:
             cnn_model = Model(inputs=[input_time, input_freq], outputs=[output])
             cnn_model.compile(
-                loss="binary_crossentropy",
+                loss="categorical_crossentropy",
                 optimizer="adam",
                 metrics=["accuracy"]
             )

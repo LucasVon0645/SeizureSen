@@ -7,8 +7,10 @@ from sklearn.metrics import roc_curve, auc
 
 from keras.api.callbacks import History
 
+from typing import Optional
 
-def plot_training_history(history: History, save_dir: str | None = None, suffix: str = ""):
+def plot_training_history(history: History, save_dir: Optional[str] = None, suffix: str = ""):
+
     """
     Plots the training and validation loss over the epochs.
 
