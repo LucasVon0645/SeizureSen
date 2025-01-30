@@ -4,6 +4,7 @@ import numpy as np
 from PIL import Image
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import pandas as pd
 
 from src.FrontEnd.utils.utils import (
     display_eeg_classes,
@@ -177,14 +178,21 @@ def app(seizure_sen_predictor: SeizureSenPredictor):
                         if len(time_chunks_list) == time_steps_model:
                             prediction_window = time_steps_model * 30
                             pred, prob = seizure_sen_predictor.classify_eeg(time_chunks_list)
-                            pred_history.append(pred)
+                            # Calculate the interval
+                            start_time = len(pred_history) * len(time_chunks_list) * chunk_period
+                            end_time = (chunk_index+1) * chunk_period
+                            interval = f"{int(start_time)}-{int(end_time)} s"
+                            pred_history.append((interval,pred))
                             with prediction_placeholder.container():
-                                st.write(pred_history)
+                                # Convert prediction history to a DataFrame for clear visualization
+                                df = pd.DataFrame(pred_history, columns=["Interval", "Prediction"])
+                                st.markdown("####  Prediction History", unsafe_allow_html=True)
+                                st.table(df)  # Display the table
                                 st.write(f"Last Prediction made on the last {prediction_window} seconds: {pred} segment detected with probability {prob:.2f}")
                                 if pred == "preictal":
                                     st.error("A seizure will likely happen!", icon="🚨")
                                 else:
-                                    st.success("No seizure predicted so far", icon="😌")
+                                    st.warning("No seizure predicted so far", icon="😌")
                             
                             time_chunks_list = [] # Reset time chunks list
 
