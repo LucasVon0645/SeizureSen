@@ -23,18 +23,20 @@ print("Preprocessing EEG data...")
 DIR_RAW_DATA = "data"
 TEST_LABELS_FILE = "TestLabels.csv"
 SAMPLING_FREQ = 400  # New sampling frequency of EEG data in Hz
-DIR_PREPROCESSED_DATA = "data/preprocessed/Dog_1_30s_slices"
+DIR_PREPROCESSED_DATA = "data/preprocessed/Dog_1_5s_slices"
 SEGMENT_DURATION = 600  # Length of each segment in seconds (10 minutes)
-WINDOW_DURATION = 30  # Duration of each slice in seconds
-USE_STD_IN_TIME_DOMAIN = False
-AUGMENT_TRAINING_DATA = True # If True, augment training data by overlapping slices
-AUGMENT_ONLY_PREICTAL = True # If True, only preictal slices are augmented
+WINDOW_DURATION = 5  # Duration of each slice in seconds
+USE_STD_IN_TIME_DOMAIN = False 
+AUGMENT_TRAINING_DATA = False # If True, augment training data by overlapping slices
+AUGMENT_ONLY_PREICTAL = False # If True, only preictal slices are augmented
 OUTPUT_FILES_NAME = {
-                    "freq_train": "freq_domain_train_augmented_preictal.npz",
-                    "freq_test": "freq_domain_test_augmented_preictal.npz",
-                    "time_train": "time_domain_train_augmented_preictal.npz",
-                    "time_test": "time_domain_test_augmented_preictal.npz",
+                    "freq_train": "freq_domain_train.npz",
+                    "freq_test": "freq_domain_test.npz",
+                    "time_train": "time_domain_train.npz",
+                    "time_test": "time_domain_test.npz",
                     }
+
+os.makedirs(DIR_PREPROCESSED_DATA, exist_ok=True)
 
 data_extractor = DataExtractor(
     data_directory=DIR_RAW_DATA, test_labels_file=TEST_LABELS_FILE
