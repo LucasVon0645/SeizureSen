@@ -220,12 +220,12 @@ def calculate_band_features(frequency_band_data, use_std_in_time_domain=False, e
         log_amplitude = np.log10(np.clip(band_data, a_min=1e-10, a_max=None))
 
         mean_log_amplitude = np.mean(log_amplitude, axis=1)  # Mean for each channel
-        std_log_amplitude = np.std(
-            log_amplitude, axis=1
-        )  # Standard deviation for each channel
 
         band_features[f"{band_name}_mean"] = mean_log_amplitude
         if not use_std_in_time_domain:
+            std_log_amplitude = np.std(
+                log_amplitude, axis=1
+            )  # Standard deviation for each channel
             band_features[f"{band_name}_std"] = std_log_amplitude
 
     if use_std_in_time_domain:
