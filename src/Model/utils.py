@@ -1,12 +1,8 @@
 import os
-import sys
 import joblib
 import json
 from typing import Optional
 from keras.api.models import Model
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
-
 
 def load_model_from_config(config: dict, class_model) -> Model:
     """
@@ -42,6 +38,10 @@ def load_scalers_from_config(config: dict) -> tuple[list[dict], list[dict]]:
     This function reads a configuration dictionary to determine the path and filename
     of a pickle file containing the scalers. It then loads the scalers from the file
     and returns the time domain and frequency domain scalers.
+    
+    The scalers consist of a list of dictionaries, where each dictionary contains the
+    the mean and standard deviation of the feature 
+    
     Args:
         config (dict): A dictionary containing the configuration. It must have the keys:
             - "model_path" (str): The path to the directory containing the scaler file.
