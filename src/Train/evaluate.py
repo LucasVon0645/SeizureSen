@@ -4,17 +4,14 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
 from src.Train.ModelTrainer import ModelTrainer
-from src.Model.MultiViewConvModel import MultiViewConvModel
-from src.Model.MultiViewConvModelAttention import MultiViewConvModelWithAttention
 
 #? Change the config path to the desired model configuration
-config_path = os.path.join("models", "model_without_attention_smote_5s_slices", "model_config.json")
+config_path = os.path.join("models", "model_without_attention_smote_5s_slices_dogs_1_2_40steps_old", "model_config.json")
 #? Change the data path to the desired preprocessed data
-data_path = os.path.join("data", "preprocessed", "Dog_1_5s_slices")
+data_path = os.path.join("data", "preprocessed", "Dog_1_2_5s_slices")
 
 #? Change the model class to the desired model
-trainer = ModelTrainer(cfg_path=config_path, data_directory=data_path,
-                       model_class=MultiViewConvModel)
+trainer = ModelTrainer(cfg_path=config_path, data_directory=data_path)
 
 #? Change the preprocessed filenames to the desired preprocessed data
 # preprocessed_filenames = {
@@ -46,5 +43,6 @@ print("y_test: ", trainer.y_test.shape)
 # trainer.load_model(weights_path, scalers_path)
 
 trainer.load_model()
-
-trainer.evaluate(save_test_pred=True)
+trainer.optimal_threshold = 0.7
+trainer.evaluate(save_test_pred=True, use_optimal_threshold = True)
+# trainer.evaluate(save_test_pred=True, use_optimal_threshold = True)

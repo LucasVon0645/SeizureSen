@@ -24,7 +24,9 @@ from src.Train.utils import (
     save_confusion_matrix,
     save_model_scores,
     plot_roc_curve,
-    print_and_save_cross_validation_results
+    print_and_save_cross_validation_results,
+    get_optimal_threshold,
+    save_threshold
 )
 from src.Preprocessing.utils import (
     load_preprocessed_data,
@@ -38,6 +40,11 @@ from src.Model.utils import (
     load_scalers_from_config,
 )
 
+from src.Model.MultiViewConvModel import MultiViewConvModel
+from src.Model.MultiViewConvModel_v2 import MultiViewConvModel_v2
+from src.Model.MultiViewConvModelAttention import MultiViewConvModelWithAttention
+from src.Model.MultiViewConvModelBatchNorm import MultiViewConvModelWithBatchNorm
+
 
 class ModelTrainer:
     """
@@ -49,14 +56,17 @@ class ModelTrainer:
     are saved to a specified file path.
     """
 
-    def __init__(self, cfg_path: str, data_directory: str, model_class: type):
+    def __init__(self, cfg_path: str, data_directory: str, model_class: Optional[type] = None):
         self.data_path = data_directory
         self.config_path = cfg_path
 
         self.config = load_config(cfg_path)
 
         self.model: Optional[Model] = None
-        self.model_class = model_class  # Store the model class for later use
+        if model_class is not None:
+            self.model_class = model_class  # Store the model class for later use
+        else:
+            self._set_model_class()
 
         # Freq Domain Tensorflow Tensors (n_samples, n_channels, fft_bins, steps)
         self.X_train_freq: Optional[tf.Tensor] = None
@@ -88,6 +98,8 @@ class ModelTrainer:
         os.makedirs(model_path, exist_ok=True)
         
         self._save_model_config()
+        
+        self.optimal_threshold = None
 
     def load_data(self, file_names_dict: Optional[dict] = None):
 
@@ -304,7 +316,7 @@ class ModelTrainer:
 
         return X_train_time_resampled, X_train_freq_resampled, y_train_resampled
 
-    def train(self):
+    def train(self, threshold_tunning=False):
         """
         Train the multi-view convolutional neural network model.
         This method trains and validates the model using the training data.
@@ -491,6 +503,22 @@ class ModelTrainer:
             show_layer_names=True,
             show_layer_activations=True,
         )
+        
+        print("\n\nModel architecture saved to: ", filepath)
+        
+        if threshold_tunning:
+            # Get the threshold that maximizes the F1 score
+            self.optimal_threshold = get_optimal_threshold(y_val, y_pred)
+            
+            print(f"\nOptimal threshold: {self.optimal_threshold}")
+            
+            # Get the classification report for the test data after threshold tunning
+            self._get_classification_report(y_val, y_pred, suffix="threshold_tunning", threshold=self.optimal_threshold)
+
+            # Save the threshold to a file
+            save_threshold(self.config["model_path"], self.optimal_threshold, "F1-score")
+            
+        print("\n\nTraining completed!")
 
     def train_fold(self, X_fft_train: ndarray, X_fft_val: ndarray, X_pca_train: ndarray, X_pca_val: ndarray, y_train: ndarray, y_val: ndarray, fold_index):
         """
@@ -637,7 +665,7 @@ class ModelTrainer:
         # Print and save the cross-validation results
         print_and_save_cross_validation_results(all_metrics, self.config["model_path"])
 
-    def evaluate(self, save_test_pred = False):
+    def evaluate(self, save_test_pred = False, use_optimal_threshold = False):
         """
         Evaluate the multi-view convolutional neural network model.
         This method evaluates the model using the test data.
@@ -685,7 +713,7 @@ class ModelTrainer:
         )
         
         if use_early_exits:
-            y_pred = y_pred[0]
+            y_pred = y_pred[0] # Get the final output
 
         # Get the classification report for the test data and save it
         self._get_classification_report(y_test, y_pred, suffix="eval")
@@ -695,6 +723,14 @@ class ModelTrainer:
         if save_test_pred:
             # Save the model predictions
             self._save_predictions_to_file(y_pred, y_test, file_name="predictions_eval.csv")
+        
+        if use_optimal_threshold:
+            if self.optimal_threshold is None:
+               raise ValueError("Optimal threshold is missing! Run the training with get_optimal_threshold=True to get the optimal threshold.")
+            # Get the classification report for the test data after threshold tunning
+            self._get_classification_report(y_test, y_pred, suffix="threshold_tunning_eval", threshold=self.optimal_threshold)
+            
+            self._save_predictions_to_file(y_pred, y_test, file_name="predictions_threshold_tunning_eval.csv", threshold=self.optimal_threshold)
 
         print("\nEvaluation completed!")
 
@@ -998,7 +1034,7 @@ class ModelTrainer:
                 )
 
     def _get_classification_report(
-        self, y_true: ndarray, y_pred: ndarray, suffix=""
+        self, y_true: ndarray, y_pred: ndarray, threshold=0.5, suffix=""
     ):
         """
         Get the classification report for the model.
@@ -1006,11 +1042,12 @@ class ModelTrainer:
         Parameters:
             y_true (np.ndarray): The true labels in categorical format (matrix like).
             y_pred (np.ndarray): The predicted labels in categorical format (matrix like).
+            threshold (float): The threshold to use for binarizing the predictions.
             suffix (str): The suffix to add to the file name.
         """
         # Binarize predictions (e.g., threshold = 0.5 for binary classification)
         y_pred_prob = y_pred[:, 1]
-        y_pred_classes = (y_pred_prob > 0.5).astype(int)
+        y_pred_classes = (y_pred_prob > threshold).astype(int)
 
         # Binarize true labels (e.g., threshold = 0.5 for binary classification)
         y_true_classes = y_true[:, 1].astype(int)
@@ -1049,9 +1086,10 @@ class ModelTrainer:
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(self.config, f, indent=4)
 
-    def _save_predictions_to_file(self, y_pred: ndarray, y_test: ndarray, file_name):
+    def _save_predictions_to_file(self, y_pred: ndarray, y_test: ndarray, file_name, threshold=0.5):
         """
-        Save a DataFrame with predicted labels, true labels, and prediction probabilities for the 'preictal' class.
+        Save a DataFrame with predicted labels, true labels, and prediction
+        probabilities for the 'preictal' class.
 
         Parameters:
         - y_pred (ndarray): Array with predicted probabilities for each class (shape: [n_samples, n_classes]).
@@ -1062,7 +1100,7 @@ class ModelTrainer:
         - None
         """
         # Determine predicted labels
-        pred_labels = np.argmax(y_pred, axis=1)
+        pred_labels = y_pred[:, 1] > threshold
 
         # Get the true labels from one-hot encoding
         true_labels = np.argmax(y_test, axis=1)
@@ -1070,7 +1108,7 @@ class ModelTrainer:
         # Get predicted probabilities for the 'preictal' class (assuming it's class 1)
         if isinstance(y_pred, list):
             y_pred = y_pred[0]
-        
+
         pred_prob_preictal = y_pred[:, 1]
 
         # Create the DataFrame
@@ -1085,3 +1123,24 @@ class ModelTrainer:
         # Save to a text file
         results_df.to_csv(filepath, sep=';', index=False)
         print(f"Predictions saved to {file_name}")
+
+    def _set_model_class(self):
+        """
+        Set the model class attribute based on the configuration.
+        Returns:
+            model_class (class): The model class based on the configuration.
+        Raises:
+            ValueError: If the model name in the configuration is not valid.
+        """
+        model_name = self.config["name"]
+        print(f"Model name: {model_name}\n")
+        if model_name == "MultiViewConvModel":
+            self.model_class = MultiViewConvModel
+        elif model_name == "MultiViewConvModel_v2":
+            self.model_class = MultiViewConvModel_v2
+        elif model_name == "MultiViewConvModelWithBatchNorm":
+            self.model_class = MultiViewConvModelWithBatchNorm
+        elif model_name == "MultiViewConvModelWithAttention":
+            self.model_class = MultiViewConvModelWithAttention
+        else:
+            raise ValueError(f"Invalid model name '{model_name}' in the configuration.")

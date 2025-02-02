@@ -3,11 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from sklearn.metrics import ConfusionMatrixDisplay
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, f1_score
+
 
 from keras.api.callbacks import History
 
 from typing import Optional
+
+import tqdm
 
 def plot_training_history(history: History, save_dir: Optional[str] = None, suffix: str = ""):
 
@@ -179,3 +182,38 @@ def print_and_save_cross_validation_results(all_metrics: dict, model_path: str, 
         for key, description in metrics_to_print.items():
             print(f"{description}: {avg_metrics[key]:.4f} +/- {std_metrics[key]:.4f}")
             f.write(f"{description}: {avg_metrics[key]:.4f} +/- {std_metrics[key]:.4f}\n")
+
+def save_threshold(model_path: str, threshold: float, metric_name: str):
+    """
+    Save the threshold to a file.
+    Parameters:
+        model_path (str): Path to the model directory.
+        threshold (float): The threshold to save.
+    Returns:
+        None
+    """
+    filename = "optimal_threshold.txt"
+    filepath = os.path.join(model_path, filename)
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(f"threshold: {threshold} (based on " + metric_name + " for preictal class)")
+    print(f"\nThreshold saved to {filename}")
+
+def get_optimal_threshold(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """
+    Get the optimal threshold that maximizes the F1 score.
+    Parameters:
+        y_true (np.ndarray): True labels.
+        y_pred (np.ndarray): Predicted probabilities.
+    Returns:
+        threshold (float): The optimal threshold.
+    """
+    if y_true.ndim == 2:
+        y_true = y_true[:, 1]
+    if y_pred.ndim == 2:
+        y_pred = y_pred[:, 1]
+    
+    thresholds = np.arange(0.1, 1.0, 0.1)
+    print("Calculating F1 scores for different thresholds...")
+    f1_scores = [f1_score(y_true, (y_pred > t).astype(int)) for t in tqdm.tqdm(thresholds)]
+    optimal_threshold = thresholds[np.argmax(f1_scores)]
+    return optimal_threshold

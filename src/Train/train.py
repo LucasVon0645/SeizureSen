@@ -4,8 +4,6 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
 from src.Train.ModelTrainer import ModelTrainer
-from src.Model.MultiViewConvModel import MultiViewConvModel
-from src.Model.MultiViewConvModelAttention import MultiViewConvModelWithAttention
 
 #? Change the config path to the desired model configuration
 config_path = os.path.join("models", "model_without_attention_smote_5s_slices_dogs_1_2_40steps", "model_config.json")
@@ -13,8 +11,7 @@ config_path = os.path.join("models", "model_without_attention_smote_5s_slices_do
 data_path = os.path.join("data", "preprocessed", "Dog_1_2_5s_slices")
 
 #? Change the model class to the desired model
-trainer = ModelTrainer(cfg_path=config_path, data_directory=data_path,
-                       model_class=MultiViewConvModel)
+trainer = ModelTrainer(cfg_path=config_path, data_directory=data_path)
 
 #? Change the preprocessed filenames to the desired preprocessed data
 # preprocessed_filenames = {
@@ -45,8 +42,8 @@ print("X_test_freq: ", trainer.X_test_freq.shape)
 print("X_test_time: ", trainer.X_test_time.shape)
 print("y_test: ", trainer.y_test.shape)
 
-trainer.train()
-trainer.evaluate(save_test_pred=True)
+trainer.train(threshold_tunning=True)
+trainer.evaluate(save_test_pred=True, use_optimal_threshold = False)
 
 # trainer.train_with_cross_validation()
 # trainer.train_full_dataset(save_test_pred=True)
