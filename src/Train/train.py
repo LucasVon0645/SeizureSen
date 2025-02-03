@@ -43,7 +43,7 @@ print("X_test_time: ", trainer.X_test_time.shape)
 print("y_test: ", trainer.y_test.shape)
 
 trainer.train(threshold_tunning=True)
-trainer.evaluate(save_test_pred=True, use_optimal_threshold = False)
+trainer.evaluate(save_test_pred=True, use_optimal_threshold = True)
 
 # trainer.train_with_cross_validation()
 # trainer.train_full_dataset(save_test_pred=True)

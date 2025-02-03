@@ -1,6 +1,6 @@
-# SeizureSen
+# SeizureSen: Predicting Seizures in Dogs Using iEEG
 
-**SeizureSen** is a project developed at **Technische Universität Darmstadt** in the seminar **Data Science II** during the **Winter Semester 24/25**. Its goal is to present an application which allows the prediction of seizures in dogs using intracranial EEG (iEEG) signals. The application utilizes machine learning to classify the preictal phase of brain activity, leveraging the dataset from the [American Epilepsy Society Seizure Prediction Challenge](https://www.kaggle.com/competitions/seizure-prediction/overview).
+**SeizureSen** is a project developed at **Technische Universität Darmstadt** in the seminar **Data Science II** during the **Winter Semester 24/25**. Its goal is to present a model which allows the prediction of seizures in dogs using intracranial EEG (iEEG) signals. A machine learning model is used to classify the preictal phase of brain activity, leveraging the dataset from the [American Epilepsy Society Seizure Prediction Challenge](https://www.kaggle.com/competitions/seizure-prediction/overview). A web application is also provided in this project as a demonstration tool. It features real-time data visualization and classification. In the frontend, a warning is given when a preictal phase is detected in the iEEG data, so that dog owners could possibly to take timely interventions
 
 ## Dataset
 
@@ -23,7 +23,13 @@ The challenge is to accurately identify the **preictal state**, which can help f
 - **Customizable Pipelines**: Easily adapt algorithms and preprocessing steps.
 - **User Interface**: Intuitive interface for testing the model and visualizing prediction results. It provides a simulation of the system.
 
----
+## Technologies Used
+
+1. TensorFlow/Keras: For deep learning-based classification.
+2. Streamlit: For interactive frontend visualization.
+3. SciPy: For signal processing and feature extraction.
+4. Statsmodels: For conducting hypothesis tests.
+
 
 ## Getting Started
 
@@ -104,7 +110,7 @@ The following fields define the configuration used for training the model in Ker
 - `augmentation_strategy` (str): Data augmentation strategy applied to the training dataset. Options: "SMOTE", "ADASYN", or null (no augmentation).
 - `preictal_class_weight` (float or null): Class weight for the preictal class. Used in model.fit() as class_weight to indicate the importance of the preictal class during training. If null, no class weighting is applied.
 - `nb_epoch` (int): Total number of training epochs.
-- `name` (str): Name identifier for the model.
+- `name` (str): Name of the model class to be used. Possible values are, e.g. "MultiViewConvModel".
 - `model_path` (str): Path where the trained model and the training/cross-validation/evaluation results are saved.
 
 ### Metrics
@@ -116,3 +122,23 @@ The following scores are calculated for evaluating a model's performance.
 - recall (for both classes)
 - f1-score (for both classes)
 - AUC of the Receiver operating characteristic
+
+## Important remarks
+
+The model, training, and preprocessing steps were inspired by the paper [Liu et al., 2019](https://doi.org/10.1109/ACCESS.2019.2955285). The code for this model can be found in the [GitHub repository](https://github.com/uobinxiao/seizure-prediction).
+
+## References
+
+1. C. -L. Liu, B. Xiao, W. -H. Hsaio and V. S. Tseng, "Epileptic Seizure Prediction With Multi-View Convolutional Neural Networks," in IEEE Access, vol. 7, pp. 170352-170361, 2019, doi: [10.1109/ACCESS.2019.2955285](https://doi.org/10.1109/ACCESS.2019.2955285).
+
+2. Xiao, B. (2025). Seizure Prediction Repository. GitHub repository. Retrieved February 3, 2025, from [https://github.com/uobinxiao/seizure-prediction](https://github.com/uobinxiao/seizure-prediction).
+
+3. Chollet, F. (2015). Keras. GitHub repository. Retrieved February 3, 2025, from [https://github.com/keras-team/keras](https://github.com/keras-team/keras).
+
+4. Abadi, M., Agarwal, A., Barham, P., et al. (2016). TensorFlow: Large-Scale Machine Learning on Heterogeneous Systems. TensorFlow. Retrieved February 3, 2025, from [https://www.tensorflow.org/](https://www.tensorflow.org/).
+
+5. Streamlit Team. (2021). Streamlit: The fastest way to build and share data apps. Streamlit. Retrieved February 3, 2025, from [https://www.streamlit.io/](https://www.streamlit.io/).
+
+6. Virtanen, P., Gommers, R., Oliphant, T. E., et al. (2020). SciPy 1.0: Fundamental Algorithms for Scientific Computing in Python. *Nature Methods, 17*(3), 261-272. [DOI: 10.1038/s41592-019-0686-2](https://doi.org/10.1038/s41592-019-0686-2).
+
+7. Seabold, S., & Perktold, J. (2010). Statsmodels: Econometric and statistical modeling with Python. *Proceedings of the 9th Python in Science Conference* (pp. 92-96). Retrieved February 3, 2025, from [https://www.statsmodels.org/](https://www.statsmodels.org/).

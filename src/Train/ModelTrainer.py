@@ -1,3 +1,4 @@
+from typing import Optional
 import json
 import os
 import sys
@@ -14,7 +15,6 @@ import tensorflow as tf
 from keras.api.utils import to_categorical, plot_model
 from keras.api.models import Model
 from keras.api.callbacks import ModelCheckpoint
-from typing import Optional
 from numpy import ndarray
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
@@ -324,9 +324,10 @@ class ModelTrainer:
         in the configuration settings.
         The best model is saved to a file using the ModelCheckpoint callback in a directory
         "checkpoint" within the model directory specified in the configuration.
-        
-        Parameters:
-        - augmentation_strategy: Data augmentation strategy to use. Default is None (No augmentation). Possible values are "SMOTE" and "ADASYN".
+        If threshold_tunning is True, the optimal threshold for classification is computed based on the validation data.
+        Validation results are also obtained using the optimal threshold.
+        Args:
+            threshold_tunning (bool): If True, get the optimal threshold for classification.
         """
 
         print("\n\nTraining the model...")
@@ -512,8 +513,10 @@ class ModelTrainer:
             
             print(f"\nOptimal threshold: {self.optimal_threshold}")
             
+            print("\n\nModel Validation with optimal threshold")
+            
             # Get the classification report for the test data after threshold tunning
-            self._get_classification_report(y_val, y_pred, suffix="threshold_tunning", threshold=self.optimal_threshold)
+            self._get_classification_report(y_val, y_pred, suffix="threshold_tunning_val", threshold=self.optimal_threshold)
 
             # Save the threshold to a file
             save_threshold(self.config["model_path"], self.optimal_threshold, "F1-score")
@@ -672,6 +675,9 @@ class ModelTrainer:
         The model is loaded from the configuration settings, and the test data
         is scaled using the scalers learned from the training data.
         The classification report is generated for the test data.
+        Args:
+            save_test_pred (bool): If True, save the model predictions to a file.
+            use_optimal_threshold (bool): If True, use the optimal threshold for classification as well.
         """
 
         self._validate_input(train=False)
@@ -695,7 +701,7 @@ class ModelTrainer:
         pca_bins = X_pca.shape[2]
         steps = X_fft.shape[3]
         config = self.config
-        
+
         use_early_exits = config.get("use_early_exits", False)
 
         # Reshape inputs for the model
@@ -711,26 +717,33 @@ class ModelTrainer:
         y_pred = multi_view_conv_model.predict(
             {"time_domain_input": X_pca, "freq_domain_input": X_fft}
         )
-        
+
         if use_early_exits:
             y_pred = y_pred[0] # Get the final output
 
         # Get the classification report for the test data and save it
         self._get_classification_report(y_test, y_pred, suffix="eval")
-        
+
         plot_roc_curve(y_test, y_pred, config["model_path"], "roc_curve_eval.png")
-        
+
         if save_test_pred:
             # Save the model predictions
             self._save_predictions_to_file(y_pred, y_test, file_name="predictions_eval.csv")
-        
+
         if use_optimal_threshold:
             if self.optimal_threshold is None:
-               raise ValueError("Optimal threshold is missing! Run the training with get_optimal_threshold=True to get the optimal threshold.")
+                raise ValueError(
+                    "Optimal threshold is missing! Run the training with get_optimal_threshold=True to get the optimal threshold."
+                )
+
+            print("\n\nModel Evaluation with optimal threshold")
+
             # Get the classification report for the test data after threshold tunning
-            self._get_classification_report(y_test, y_pred, suffix="threshold_tunning_eval", threshold=self.optimal_threshold)
-            
-            self._save_predictions_to_file(y_pred, y_test, file_name="predictions_threshold_tunning_eval.csv", threshold=self.optimal_threshold)
+            self._get_classification_report(y_test, y_pred, suffix="threshold_tunning_eval",
+                                            threshold=self.optimal_threshold)
+            # Save the model predictions with the optimal threshold
+            self._save_predictions_to_file(y_pred, y_test, file_name="predictions_threshold_tunning_eval.csv",
+                                           threshold=self.optimal_threshold)
 
         print("\nEvaluation completed!")
 
@@ -1100,7 +1113,7 @@ class ModelTrainer:
         - None
         """
         # Determine predicted labels
-        pred_labels = y_pred[:, 1] > threshold
+        pred_labels = (y_pred[:, 1] > threshold).astype(int)
 
         # Get the true labels from one-hot encoding
         true_labels = np.argmax(y_test, axis=1)

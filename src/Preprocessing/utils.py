@@ -522,7 +522,7 @@ def inject_noise_slice(eeg_slice: np.ndarray, sigma=0.01) -> np.ndarray:
 
 def augment_raw_train_slices(train_slices_with_label: list[tuple[np.ndarray, int]], only_class_1 = False) -> tuple[np.ndarray, np.ndarray]:
     """
-    Augment the raw training slices using the overlap technique.
+    Augment the raw training slices by overlapping and adding noise to the slices.
     Parameters:
         train_slices_with_label: list of tuples
             A list of tuples containing the raw training slices and their corresponding labels.
@@ -548,7 +548,7 @@ def augment_raw_train_slices(train_slices_with_label: list[tuple[np.ndarray, int
 
     final_augmented_list = []
 
-    for (slc, lbl) in train_slices_with_label_aug:
+    for (slc, lbl) in train_slices_with_label_augmented:
         final_augmented_list.append((slc, lbl))  # always keep the original
 
         # Only augment if it's Preictal
@@ -569,7 +569,7 @@ def augment_raw_train_slices(train_slices_with_label: list[tuple[np.ndarray, int
                 final_augmented_list.append((interictal_noised, lbl))
 
     print(f"Original training samples: {len(train_slices_with_label)}")
-    print(f"After overlap, we had: {len(train_slices_with_label_aug)}")
+    print(f"After overlap, we had: {len(train_slices_with_label_augmented)}")
     print(f"Final augmented count (including time shift, noise): {len(final_augmented_list)}")
 
     return final_augmented_list
