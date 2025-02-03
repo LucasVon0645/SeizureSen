@@ -496,6 +496,30 @@ def scale_across_time_tf(data: tf.Tensor, scalers: list[dict]) -> tf.Tensor:
 
     return scaled_data
 
+def time_shift_slice(eeg_slice: np.ndarray, shift_seconds=2, sampling_freq=400) -> np.ndarray:
+    """
+    Shift the EEG slice right by 'shift_seconds' worth of samples. Pad with zeroes at the start
+    """
+    # Samples to shift
+    shift_samples = int(shift_seconds * sampling_freq)
+
+    n_channels, n_samples = eeg_slice.shape
+
+    shifted_array = np.zeros_like(eeg_slice)
+    # Shift "to the right" by shift_samples, discarding the end
+    idx_end = n_samples - shift_samples
+    if idx_end > 0:
+        shifted_array[:, shift_samples:] = eeg_slice[:, :idx_end]
+
+    return shifted_array
+
+def inject_noise_slice(eeg_slice: np.ndarray, sigma=0.01) -> np.ndarray:
+    """
+    Add Gaussian noise to the EEG slice.
+    """
+    noise = np.random.normal(0, sigma, eeg_slice.shape)
+    return eeg_slice + noise
+
 def augment_raw_train_slices(train_slices_with_label: list[tuple[np.ndarray, int]], only_class_1 = False) -> tuple[np.ndarray, np.ndarray]:
     """
     Augment the raw training slices using the overlap technique.
@@ -521,8 +545,31 @@ def augment_raw_train_slices(train_slices_with_label: list[tuple[np.ndarray, int
 
     # Repack the augmented data
     train_slices_with_label_augmented = list(zip(train_slices_augmented, train_labels_augmented))
-    
+
+    final_augmented_list = []
+
+    for (slc, lbl) in train_slices_with_label_aug:
+        final_augmented_list.append((slc, lbl))  # always keep the original
+
+        # Only augment if it's Preictal
+        if lbl == 1:
+            # 1) Time shift augmentation
+            shifted_slc = time_shift_slice(slc, shift_seconds=2, sampling_freq=400)
+            final_augmented_list.append((shifted_slc, lbl))
+
+            # 2) Noise injection
+            noised_slc = inject_noise_slice(slc, sigma=0.01)
+            final_augmented_list.append((noised_slc, lbl))
+        else:
+            # If we are not restricting to only_class_1,
+            # we could optionally add minor augmentations for Interictal too
+            if not only_class_1:
+                # Example: Just do mild noise for Interictal
+                interictal_noised = inject_noise_slice(slc, sigma=0.005)
+                final_augmented_list.append((interictal_noised, lbl))
+
     print(f"Original training samples: {len(train_slices_with_label)}")
-    print(f"Augmented training samples: {len(train_slices_with_label_augmented)}")
-    
-    return train_slices_with_label_augmented
+    print(f"After overlap, we had: {len(train_slices_with_label_aug)}")
+    print(f"Final augmented count (including time shift, noise): {len(final_augmented_list)}")
+
+    return final_augmented_list
