@@ -3,6 +3,8 @@ from keras.api.models import Model
 from keras.api.layers import Dense, Dropout, Flatten, Input, Conv2D, concatenate
 from keras.api.optimizers import SGD, Adam
 from keras.api.regularizers import L2
+from src.Model.losses import focal_loss, f1_loss
+
 
 class MultiViewConvModel_v2:
     """
@@ -171,6 +173,15 @@ class MultiViewConvModel_v2:
         # Add final classification layer with sigmoid activation for multi-class classification
         output = Dense(2, activation="sigmoid", name="final_output")(merged)
 
+        loss_function = config.get("loss", "binary_crossentropy")  # Default to binary_crossentropy
+
+        if loss_function == "focal":
+            loss_fn = focal_loss(gamma=2.0, alpha=0.25)
+        elif loss_function == "f1":
+            loss_fn = f1_loss
+        else:
+            loss_fn = "binary_crossentropy"
+
         # Model definition
         if use_early_exits:
             # Create a model with early exits
@@ -178,11 +189,11 @@ class MultiViewConvModel_v2:
             cnn_model.compile(
                 optimizer=SGD(learning_rate=config["learning_rate"]),
                 loss={
-                    "final_output": "categorical_crossentropy",
-                    "early_exit1": "categorical_crossentropy",
-                    "early_exit2": "categorical_crossentropy",
-                    "early_exit3": "categorical_crossentropy",
-                    "early_exit4": "categorical_crossentropy",
+                    "final_output": loss_fn,
+                    "early_exit1": loss_fn,
+                    "early_exit2": loss_fn,
+                    "early_exit3": loss_fn,
+                    "early_exit4": loss_fn,
                 },
                 # Weights for the losses of the different outputs
                 loss_weights={
@@ -203,7 +214,7 @@ class MultiViewConvModel_v2:
         else:
             cnn_model = Model(inputs=[input_time, input_freq], outputs=[output])
             cnn_model.compile(
-                loss="binary_crossentropy",
+                loss=loss_fn,
                 optimizer=Adam(learning_rate=1e-3),  # Reduce from default 1e-3
                 metrics=["accuracy"]
             )
@@ -215,6 +226,8 @@ class MultiViewConvModel_v2:
             restore_best_weights=True,  # Restore model weights from the best epoch
             verbose=1,  # Print messages when early stopping is triggered
         )
+
+        print(f"Using Loss Function: {loss_function}")
 
         # Return the model and the early stopping callback
         return cnn_model, early_stopping
