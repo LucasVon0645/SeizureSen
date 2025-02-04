@@ -50,7 +50,7 @@ def app(seizure_sen_predictor: SeizureSenPredictor):
     # Adding heading in the second column.
     col2.markdown(
         """
-    <h1 class="main-title">
+    <h1 class="main-title" style="font-size: 1.5em;">
         Seizure Prediction App
     </h1>
     """,
@@ -61,7 +61,7 @@ def app(seizure_sen_predictor: SeizureSenPredictor):
     try:
         # Opening the image
         dog_image = Image.open(dog_image_path)
-        col1.image(dog_image, width=110)
+        col1.image(dog_image, width=80)
     except Exception as e:
         # We can comment this as the image is  optional(for aesthetic reasons).
         st.error(f"Error loading the image: {e}")
@@ -176,13 +176,15 @@ def app(seizure_sen_predictor: SeizureSenPredictor):
                         fig = make_subplots(
                             rows=n_rows,
                             cols=n_cols,
-                            vertical_spacing=1.0,  # Adjust spacing between subplots
+                            vertical_spacing=1.0,  
                             horizontal_spacing=0.1,
                             subplot_titles=[f"Channel {metadata['channels'][idx]}" for idx in selected_indices]
                         )
-                        # Reduce the size of the inner plots
                         fig.update_layout(
-                            height=300  # Adjust the height as needed
+                            height=300, 
+                            margin=dict(l=5, r=5, t=10, b=5),  
+                            font=dict(size=10),  
+                            
                         )
                         
                         # Check if we have enough time chunks to make a prediction
@@ -203,10 +205,11 @@ def app(seizure_sen_predictor: SeizureSenPredictor):
                                     df = pd.DataFrame(pred_history, columns=["Interval", "Prediction", "Probability", "True Label"])
                                     df["Prediction"] = df["Prediction"].map({0: "interictal", 1: "preictal"})
                                     df["True Label"] = df["True Label"].map({0: "interictal", 1: "preictal"})
-                                    st.markdown("#### Classification History", unsafe_allow_html=True)
-                                    st.markdown(df.style.hide(axis="index").to_html(), unsafe_allow_html=True) # Display the table without the index column
+                                    st.markdown("##### Classification History", unsafe_allow_html=True)
+                                    st.markdown(f"<style>table{{font-size:12px;width:80%!important;margin:0 auto;}}th,td{{padding:4px 8px!important;}}</style>{df.style.hide(axis='index').to_html()}", unsafe_allow_html=True)
+                                    
                                 with col2:
-                                    st.markdown("#### Warning System", unsafe_allow_html=True)
+                                    st.markdown("##### Warning System", unsafe_allow_html=True)
                                     st.markdown(f"The final warning is decided based on the majority voting of the last {warning_window} classifications", unsafe_allow_html=True)
                                     last_predictions = [pred for _, pred, _, _ in pred_history[-warning_window:]]
                                     if sum(last_predictions) >= warning_window / 2 and len(last_predictions) >= warning_window:
@@ -249,7 +252,7 @@ def app(seizure_sen_predictor: SeizureSenPredictor):
                                     title_standoff=30,
                                 )
 
-                            # Update layout with reduced title font size and padding
+                            
                             fig.update_layout(
                                 height=300,  # Adjust the height as needed
                                 plot_bgcolor='#041216',  # Set the background of the plot area
