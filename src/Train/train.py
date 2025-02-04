@@ -6,7 +6,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"
 from src.Train.ModelTrainer import ModelTrainer
 
 #? Change the config path to the desired model configuration
-config_path = os.path.join("models", "model_without_attention_smote_5s_slices_dogs_1_2_40steps", "model_config.json")
+config_path = os.path.join("models", "config", "model_without_attention_cfg.json")
 #? Change the data path to the desired preprocessed data
 data_path = os.path.join("data", "preprocessed", "Dog_1_2_5s_slices")
 
