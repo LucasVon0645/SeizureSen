@@ -4,6 +4,7 @@ from keras.api.layers import Dense, Dropout, Flatten, Input, Conv2D, concatenate
 from keras.api.optimizers import SGD, Adam
 from keras.api.regularizers import L2
 from src.Model.losses import focal_loss, f1_loss
+from keras_tuner import HyperParameters
 
 
 class MultiViewConvModel_v2:
@@ -19,7 +20,7 @@ class MultiViewConvModel_v2:
     """
 
     @classmethod
-    def get_model(cls, config: dict):
+    def get_model(cls, config: dict, hp: HyperParameters = None):
         """
         Builds and compiles a convolutional neural network model for EEG data analysis.
         Args:
@@ -44,6 +45,12 @@ class MultiViewConvModel_v2:
             - early_exit4: Early exit classification output from the second
                            branch after additional convolution.
         """
+
+        if hp:
+            config["nb_filter"] = hp.Int('nb_filter', min_value=16, max_value=128, step=16)
+            config["l2"] = hp.Float('l2', min_value=1e-5, max_value=1e-2, sampling='log')
+            config["dropout"] = hp.Float('dropout', min_value=0.1, max_value=0.5, step=0.1)
+            config["learning_rate"] = hp.Choice('learning_rate', values=[1e-4, 5e-4, 1e-3, 5e-3])
 
         # Define the input shapes for the model
         channels = config["channels"]
@@ -213,9 +220,10 @@ class MultiViewConvModel_v2:
             )
         else:
             cnn_model = Model(inputs=[input_time, input_freq], outputs=[output])
+            optimizer = Adam(learning_rate=config["learning_rate"])
             cnn_model.compile(
                 loss=loss_fn,
-                optimizer=Adam(learning_rate=1e-3),  # Reduce from default 1e-3
+                optimizer=optimizer,  # Reduce from default 1e-3
                 metrics=["accuracy"]
             )
 
