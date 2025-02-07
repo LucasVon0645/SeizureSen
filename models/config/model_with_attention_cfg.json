@@ -1,19 +1,19 @@
 {
     "nb_filter": 64,
     "l2": 0.001,
-    "dropout": 0.4,
+    "dropout": 0.2,
     "learning_rate": 0.01,
     "model_time_steps": 40,
     "channels": 16,
     "fft_bins": 16,
     "pca_bins": 16,
-    "nn_time_output": 128,
-	"nn_freq_output": 128,
+    "nn_time_output": 64,
+	"nn_freq_output": 64,
     "batch_size": 64,
     "use_early_exits": true,
     "augmentation_strategy": "SMOTE",
     "preictal_class_weight": null,
     "nb_epoch": 100,
     "name": "MultiViewConvModelWithAttention",
-    "model_path": "models\\model_with_attention_smote_5s_slices_dogs_1_2_dropout_0.4"
+    "model_path": "models\\model_with_attention_smote_5s_slices_dogs_1_2"
 }

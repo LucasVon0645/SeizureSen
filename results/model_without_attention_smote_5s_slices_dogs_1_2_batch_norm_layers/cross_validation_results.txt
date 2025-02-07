@@ -1,0 +1,7 @@
+Average Accuracy: 0.9557 +/- 0.0046
+Average Precision (Interictal): 0.9683 +/- 0.0064
+Average Recall (Interictal): 0.9850 +/- 0.0071
+Average F1-Score (Interictal): 0.9766 +/- 0.0025
+Average Precision (Preictal): 0.7186 +/- 0.0845
+Average Recall (Preictal): 0.5206 +/- 0.0998
+Average F1-Score (Preictal): 0.5927 +/- 0.0582
