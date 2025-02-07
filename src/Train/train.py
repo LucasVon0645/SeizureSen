@@ -17,6 +17,7 @@ threshold_tunning = False
 trainer = ModelTrainer(cfg_path=config_path, data_directory=data_path)
 
 #? Change the preprocessed filenames to the desired preprocessed data
+
 preprocessed_filenames = {
     "freq_train": "freq_domain_train.npz",
     "freq_test": "freq_domain_test.npz",
@@ -38,6 +39,6 @@ print("X_test_freq: ", trainer.X_test_freq.shape)
 print("X_test_time: ", trainer.X_test_time.shape)
 print("y_test: ", trainer.y_test.shape)
 
-# trainer.train(threshold_tunning=threshold_tunning)
-# trainer.evaluate(save_test_pred=True, use_optimal_threshold=threshold_tunning)
+trainer.train(threshold_tunning=threshold_tunning)
+trainer.evaluate(save_test_pred=True, use_optimal_threshold=threshold_tunning)
 # trainer.train_with_cross_validation()
