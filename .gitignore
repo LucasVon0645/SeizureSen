@@ -6,7 +6,8 @@ models/*
 # But do not ignore
 !/models/config/
 !/models/model_without_attention_smote_5s_slices_dogs_1_2_40steps
-!/data/TestLabels.csv
+!/data/TestLabels.
+!/data/FrontEndDemo
 !.gitkeep
 
 *.h5
