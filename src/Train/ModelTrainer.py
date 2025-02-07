@@ -101,7 +101,7 @@ class ModelTrainer:
         
         self.optimal_threshold = None
 
-    def load_data(self, file_names_dict: Optional[dict] = None):
+    def load_data(self, file_names_dict: Optional[dict] = None, only_test_data: bool = False):
 
         #def load_data(self, file_names_dict=dict | None):
         """
@@ -132,35 +132,35 @@ class ModelTrainer:
                 "time_train": "time_domain_train.npz",
                 "time_test": "time_domain_test.npz",
             }
-
-        # Load preprocessed slices of eeg data for train and evaluation
-
-        data_train_freq = load_preprocessed_data(
-            data_dir, file_names_dict["freq_train"]
-        )
-        data_test_freq = load_preprocessed_data(data_dir, file_names_dict["freq_test"])
-
-        data_train_time = load_preprocessed_data(
-            data_dir, file_names_dict["time_train"]
-        )
-        data_test_time = load_preprocessed_data(data_dir, file_names_dict["time_test"])
-
+        
         steps = self.config["model_time_steps"]
 
-        # Transform the data into tensors
-        # Consecutive slices with same label are grouped together (group size = steps)
+        # Load preprocessed slices of eeg data for train and evaluation
+        if not only_test_data:
+            data_train_freq = load_preprocessed_data(
+                data_dir, file_names_dict["freq_train"]
+            )
+            data_train_time = load_preprocessed_data(
+                data_dir, file_names_dict["time_train"]
+            )
 
-        # Frequency domain data (train and test)
-        self.X_train_freq, self.y_train = transform_to_tensor(
-            data_train_freq["X"], data_train_freq["y"], steps
-        )
+            # Transform the train data into tensors
+            # Consecutive slices with same label are grouped together (group size = steps)
+            self.X_train_freq, self.y_train = transform_to_tensor(
+                data_train_freq["X"], data_train_freq["y"], steps
+            )
+            self.X_train_time, _ = transform_to_tensor(
+                data_train_time["X"], data_train_time["y"], steps
+            )
+
+        # Load preprocessed slices of eeg data for test
+        data_test_freq = load_preprocessed_data(data_dir, file_names_dict["freq_test"])
+        data_test_time = load_preprocessed_data(data_dir, file_names_dict["time_test"])
+
+        # Transform the test data into tensors
+        # Consecutive slices with same label are grouped together (group size = steps)
         self.X_test_freq, self.y_test = transform_to_tensor(
             data_test_freq["X"], data_test_freq["y"], steps
-        )
-
-        # Time domain data (train and test)
-        self.X_train_time, _ = transform_to_tensor(
-            data_train_time["X"], data_train_time["y"], steps
         )
         self.X_test_time, _ = transform_to_tensor(
             data_test_time["X"], data_test_time["y"], steps

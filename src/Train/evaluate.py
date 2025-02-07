@@ -6,21 +6,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"
 from src.Train.ModelTrainer import ModelTrainer
 
 #? Change the config path to the desired model configuration
-config_path = os.path.join("models", "model_without_attention_smote_5s_slices_dogs_1_2_40steps_old", "model_config.json")
+config_path = os.path.join("models", "model_without_attention_smote_5s_slices_dogs_1_2_aug_v2", "model_config.json")
 #? Change the data path to the desired preprocessed data
-data_path = os.path.join("data", "preprocessed", "Dog_1_2_5s_slices")
+data_path = os.path.join("data", "preprocessed", "Dog_1_2_5s_slices_aug")
 
 #? Change the model class to the desired model
 trainer = ModelTrainer(cfg_path=config_path, data_directory=data_path)
 
 #? Change the preprocessed filenames to the desired preprocessed data
-# preprocessed_filenames = {
-#     "freq_train": "freq_domain_train_augmented_preictal.npz",
-#     "freq_test": "freq_domain_test_augmented_preictal.npz",
-#     "time_train": "time_domain_train_augmented_preictal.npz",
-#     "time_test": "time_domain_test_augmented_preictal.npz",
-# }
-
 preprocessed_filenames = {
     "freq_train": "freq_domain_train.npz",
     "freq_test": "freq_domain_test.npz",
@@ -28,7 +21,7 @@ preprocessed_filenames = {
     "time_test": "time_domain_test.npz",
 }
 
-trainer.load_data(preprocessed_filenames)
+trainer.load_data(preprocessed_filenames, only_test_data=True)
 
 print("\n\nConfiguration settings")
 print(trainer.config)
@@ -43,6 +36,6 @@ print("y_test: ", trainer.y_test.shape)
 # trainer.load_model(weights_path, scalers_path)
 
 trainer.load_model()
-trainer.optimal_threshold = 0.7
-trainer.evaluate(save_test_pred=True, use_optimal_threshold = True)
+# trainer.optimal_threshold = 0.7
+trainer.evaluate(save_test_pred=True, use_optimal_threshold = False)
 # trainer.evaluate(save_test_pred=True, use_optimal_threshold = True)

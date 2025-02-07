@@ -1,8 +1,10 @@
 import numpy as np
 import tensorflow as tf
 
-from src.Model.MultiViewConvModelAttention import MultiViewConvModelWithAttention
 from src.Model.MultiViewConvModel import MultiViewConvModel
+from src.Model.MultiViewConvModel_v2 import MultiViewConvModel_v2
+from src.Model.MultiViewConvModelAttention import MultiViewConvModelWithAttention
+from src.Model.MultiViewConvModelBatchNorm import MultiViewConvModelWithBatchNorm
 from src.Model.utils import (
     load_config,
     load_model_from_config,
@@ -15,10 +17,11 @@ from src.Preprocessing.utils import transform_features_to_tensor, scale_across_t
 class SeizureSenPredictor:
     def __init__(self, model_config_path):
         self.config = load_config(model_config_path)
+        self.model_class = self._get_model_class()
+
         # Load the model
-        # Change the class model here if needed
         self.model = load_model_from_config(
-            self.config, MultiViewConvModel
+            self.config, self.model_class
         )
 
         self.scalers_time, self.scalers_freq = load_scalers_from_config(self.config)
@@ -116,3 +119,25 @@ class SeizureSenPredictor:
         Get the number of time steps the model expects.
         """
         return self.config["model_time_steps"]
+
+    def _get_model_class(self):
+        """
+        Get the model class based on the configuration.
+        Returns:
+            model_class (class): The model class based on the configuration.
+        Raises:
+            ValueError: If the model name in the configuration is not valid.
+        """
+
+        model_name = self.config["name"]
+
+        if model_name == "MultiViewConvModel":
+            return MultiViewConvModel
+        elif model_name == "MultiViewConvModel_v2":
+            return MultiViewConvModel_v2
+        elif model_name == "MultiViewConvModelWithBatchNorm":
+            return MultiViewConvModelWithBatchNorm
+        elif model_name == "MultiViewConvModelWithAttention":
+            return MultiViewConvModelWithAttention
+        else:
+            raise ValueError(f"Invalid model name '{model_name}' in the configuration.")

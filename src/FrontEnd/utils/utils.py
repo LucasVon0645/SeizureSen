@@ -25,7 +25,7 @@ def extract_eeg_from_specific_file(file_name):
         labels = None
     else:
         segment_type = "test"
-        labels = segment["labels"]
+        labels = segment["labels"] if "labels" in segment.dtype.names else None
 
     # Extracting data and metadata from the wrapped nested structure
 
@@ -116,15 +116,16 @@ def load_css():
     return css
 
 
-def display_eeg_classes(labels, expander_title="EEG Classes Over Time"):
+def display_eeg_classes(labels, time_per_label, expander_title="EEG Classes Over Time"):
     """
     Display EEG classes over time in a Streamlit expander.
 
     Args:
         labels (list): List of labels with numbers 0 and 1. 0 corresponds to class "interictal" and 1 to "preictal".
+        time_per_label (int): Time duration of each label in seconds.
         expander_title (str): Title of the expander.
     """
-    time_periods = [f"{i*10}-{(i+1)*10} min" for i in range(len(labels))]
+    time_periods = [f"{i*time_per_label}-{(i+1)*time_per_label} seconds" for i in range(len(labels))]
     classes = ["interictal" if label == 0 else "preictal" for label in labels]
 
     data = {"Time Period": time_periods, "EEG Class": classes}
@@ -142,7 +143,10 @@ def load_and_prefilter_eeg(uploaded_file, new_sampling_freq):
     data = extract_eeg_from_specific_file(uploaded_file)
     eeg_data = data["eeg_data"]
     metadata = data["metadata"]
-    labels = data["labels"]
+    if "labels" in data.keys():
+        labels = data["labels"]
+    else:
+        labels = None
 
     total_duration = data["metadata"]["duration"]
 

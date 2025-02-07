@@ -13,7 +13,7 @@ st.set_page_config(
 def load_model():
     model_config_path = os.path.join(
         "models",
-        "model_without_attention_smote_5s_slices_dogs_1_2_40steps",
+        "best_model_auc_80",
         "model_config.json",
     )
     return SeizureSenPredictor(model_config_path)

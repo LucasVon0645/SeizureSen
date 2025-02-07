@@ -78,12 +78,10 @@ def app(seizure_sen_predictor: SeizureSenPredictor):
             sampling_freq = 400
             eeg_data, metadata, labels = load_and_prefilter_eeg(uploaded_file, sampling_freq)
             time_duration_per_label = 600  # 10-minute intervals
-            
-            eeg_type = metadata["type"]
 
             display_metadata_in_expander(metadata)
-            if eeg_type == "test":
-                display_eeg_classes(labels)
+            if labels is not None:
+                display_eeg_classes(labels, time_per_label=time_duration_per_label)
 
             sampling_freq = metadata["sampling_frequency"]
             
@@ -148,9 +146,7 @@ def app(seizure_sen_predictor: SeizureSenPredictor):
                     
                     # Initialize time chunks list and prediction history
                     time_chunks_list = [] # List to store time chunks that will be used at the same time to make a prediction
-                    
-                    warning_window = 3
-                    
+                                        
                     for chunk in simulate_streaming(
                         eeg_data, chunk_size, update_period
                     ):
@@ -210,12 +206,14 @@ def app(seizure_sen_predictor: SeizureSenPredictor):
                                     
                                 with col2:
                                     st.markdown("##### Warning System", unsafe_allow_html=True)
-                                    st.markdown(f"The final warning is decided based on the majority voting of the last {warning_window} classifications", unsafe_allow_html=True)
-                                    last_predictions = [pred for _, pred, _, _ in pred_history[-warning_window:]]
-                                    if sum(last_predictions) >= warning_window / 2 and len(last_predictions) >= warning_window:
+                                    last_pred = df.iloc[-1]["Prediction"]
+                                    interval_seconds = int(end_time - start_time)
+                                    prob = df.iloc[-1]["Probability"]
+                                    st.markdown(f"Classification of last {interval_seconds}s: {last_pred} with probability {prob:.3f}", unsafe_allow_html=True)
+                                    if pred == 1:
                                         st.error("A seizure will likely happen!", icon="🚨")
                                     else:
-                                        st.warning("No seizure predicted")
+                                        st.warning("No seizure predicted in the moment")
                             
                             time_chunks_list = [] # Reset time chunks list
 
@@ -224,7 +222,6 @@ def app(seizure_sen_predictor: SeizureSenPredictor):
                             progress_bar.progress(
                                 chunk_index / total_chunks, text="Simulation Progress"
                             )
-                            # rows_cols_index_grid = [(1, 1), (1, 2), (2, 1), (2, 2)]
                             rows_cols_index_grid = [(1, 1), (1, 2), (1, 3)]
 
                             for idx, channel_index in enumerate(selected_indices):
