@@ -5,6 +5,7 @@ models/*
 
 # But do not ignore
 !/models/config/
+!/models/best_model/
 !/data/TestLabels.
 !/data/FrontEndDemo
 !.gitkeep
