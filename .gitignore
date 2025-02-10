@@ -9,9 +9,6 @@ models/*
 !/data/FrontEndDemo
 !.gitkeep
 
-*.h5
-*.pt
-*.keras
 
 # Python cache and virtual environment
 __pycache__/

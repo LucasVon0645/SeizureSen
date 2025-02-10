@@ -14,6 +14,19 @@ class MultiViewConvModelWithBatchNorm:
     def get_model(cls, config: dict):
         """
         Builds and compiles a convolutional neural network model for EEG data analysis.
+        This architecture consists of two input branches, one processing PCA-transformed data and
+        the other processing FFT-transformed data. The branches are then merged and passed through
+        several dense layers before producing the final output.
+        Convolutional layers are followed by batch normalization and dropout layers to improve
+        the model's generalization and performance. In total, the model has:
+        - 3 convolutional layers for each input branch
+        - 2 batch normalization layers for each input branch
+        - 3 dropout layers for each input branch
+        - 3 dense layers after merging the branches
+        
+        Args:
+            config (dict): A dictionary containing various hyperparameters
+                           and settings for the model.
         """
         channels = config["channels"]
         pca_bins = config["pca_bins"]
@@ -43,17 +56,6 @@ class MultiViewConvModelWithBatchNorm:
         seq1 = Activation("relu", name="time_activation_layer3")(seq1)
         seq1 = Dropout(config["dropout"], name="time_dropout_layer3")(seq1)
 
-        # seq1 = Conv2D(filters=config["nb_filter"], kernel_size=(1, 3),
-        #               kernel_initializer="lecun_uniform", kernel_regularizer=L2(config["l2"]),
-        #               name="time_conv_layer4")(seq1)
-        # seq1 = Activation("relu", name="time_activation_layer4")(seq1)
-        # seq1 = Dropout(config["dropout"], name="time_dropout_layer4")(seq1)
-
-        # seq1 = Conv2D(filters=config["nb_filter"], kernel_size=(1, 3),
-        #               kernel_initializer="lecun_uniform", kernel_regularizer=L2(config["l2"]),
-        #               name="time_conv_layer5")(seq1)
-        # seq1 = Activation("relu", name="time_activation_layer5")(seq1)
-
         seq1 = Flatten(name="time_flatten_layer")(seq1)
         output1 = Dense(config["nn_time_output"], activation="tanh", name="cnn_time_output")(seq1)
 
@@ -80,17 +82,6 @@ class MultiViewConvModelWithBatchNorm:
         seq2 = Activation("relu", name="freq_activation_layer3")(seq2)
         seq2 = Dropout(config["dropout"], name="freq_dropout_layer3")(seq2)
 
-        # seq2 = Conv2D(filters=config["nb_filter"], kernel_size=(1, 3),
-        #               kernel_initializer="lecun_uniform", kernel_regularizer=L2(config["l2"]),
-        #               name="freq_conv_layer4")(seq2)
-        # seq2 = Activation("relu", name="freq_activation_layer4")(seq2)
-        # seq2 = Dropout(config["dropout"], name="freq_dropout_layer4")(seq2)
-
-        # seq2 = Conv2D(filters=config["nb_filter"], kernel_size=(1, 3),
-        #               kernel_initializer="lecun_uniform", kernel_regularizer=L2(config["l2"]),
-        #               name="freq_conv_layer5")(seq2)
-        # seq2 = Activation("relu", name="freq_activation_layer5")(seq2)
-
         seq2 = Flatten(name="freq_flatten_layer")(seq2)
         output2 = Dense(config["nn_freq_output"], activation="tanh", name="cnn_freq_output")(seq2)
 
@@ -101,12 +92,12 @@ class MultiViewConvModelWithBatchNorm:
         merged = Dense(128, activation="tanh", name="fcn_layer3")(merged)
 
         # Final classification layer
-        output = Dense(2, activation="sigmoid", name="final_output")(merged)
+        output = Dense(2, activation="softmax", name="final_output")(merged)
 
         # Model definition
         cnn_model = Model(inputs=[input_time, input_freq], outputs=[output])
         cnn_model.compile(
-            loss="binary_crossentropy",
+            loss="categorical_crossentropy",
             optimizer=Adam(learning_rate=config["learning_rate"]),
             metrics=["accuracy"]
         )

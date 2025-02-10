@@ -6,7 +6,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"
 from src.Train.ModelTrainer import ModelTrainer
 
 #? Change the config path to the desired model configuration
-config_path = os.path.join("models", "model_without_attention_smote_5s_slices_dogs_1_2_aug_v2", "model_config.json")
+config_path = os.path.join("results", "model_without_attention_v2_5s_slices_dogs_1_2_SMOTE_early_exits", "model_config.json")
 #? Change the data path to the desired preprocessed data
 data_path = os.path.join("data", "preprocessed", "Dog_1_2_5s_slices_aug")
 
@@ -37,5 +37,5 @@ print("y_test: ", trainer.y_test.shape)
 
 trainer.load_model()
 # trainer.optimal_threshold = 0.7
-trainer.evaluate(save_test_pred=True, use_optimal_threshold = False)
+trainer.evaluate(save_test_pred=False, use_optimal_threshold = False)
 # trainer.evaluate(save_test_pred=True, use_optimal_threshold = True)

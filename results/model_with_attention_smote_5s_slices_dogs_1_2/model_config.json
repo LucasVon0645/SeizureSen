@@ -15,5 +15,5 @@
     "preictal_class_weight": null,
     "nb_epoch": 100,
     "name": "MultiViewConvModelWithAttention",
-    "model_path": "models\\model_with_attention_smote_5s_slices_dogs_1_2"
+    "model_path": "results\\model_with_attention_smote_5s_slices_dogs_1_2"
 }

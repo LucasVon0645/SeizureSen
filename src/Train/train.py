@@ -6,9 +6,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"
 from src.Train.ModelTrainer import ModelTrainer
 
 #? Change the config path to the desired model configuration
-config_path = os.path.join("models", "config", "model_without_attention_cfg.json")
+config_path = os.path.join("results", "model_without_attention_v2_5s_slices_dogs_1_2_SMOTE", "model_config.json")
 #? Change the data path to the desired preprocessed data
-data_path = os.path.join("data", "preprocessed", "Dog_1_2_5s_slices")
+data_path = os.path.join("data", "preprocessed", "Dog_1_2_5s_slices_aug")
 
 #? Change the threshold_tunning to True if you want to tune the threshold for the model
 threshold_tunning = False
@@ -41,4 +41,4 @@ print("y_test: ", trainer.y_test.shape)
 
 trainer.train(threshold_tunning=threshold_tunning)
 trainer.evaluate(save_test_pred=True, use_optimal_threshold=threshold_tunning)
-# trainer.train_with_cross_validation()
+trainer.train_with_cross_validation()

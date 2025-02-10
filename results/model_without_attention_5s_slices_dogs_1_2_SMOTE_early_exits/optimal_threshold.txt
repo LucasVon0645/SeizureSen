@@ -1,0 +1,1 @@
+threshold: 0.6 (based on F1-score for preictal class)

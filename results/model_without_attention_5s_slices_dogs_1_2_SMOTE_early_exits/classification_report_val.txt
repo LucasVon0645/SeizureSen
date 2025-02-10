@@ -1,0 +1,8 @@
+              precision    recall  f1-score   support
+
+  Interictal       0.97      0.99      0.98       588
+    Preictal       0.83      0.62      0.71        40
+
+    accuracy                           0.97       628
+   macro avg       0.90      0.81      0.85       628
+weighted avg       0.97      0.97      0.97       628

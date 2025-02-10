@@ -15,6 +15,6 @@
     "augmentation_strategy": "SMOTE",
     "preictal_class_weight": null,
 	"name": "MultiViewConvModel",
-    "model_path": "models\\model_without_attention_smote_5s_slices_dogs_1_2",
+    "model_path": "models\\new",
     "loss": "binary"
 }

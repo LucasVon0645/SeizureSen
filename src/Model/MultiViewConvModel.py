@@ -33,7 +33,7 @@ class MultiViewConvModel:
             - input_time: PCA-transformed EEG data with shape (channels * pca_bins, steps, 1).
             - input_freq: FFT-transformed EEG data with shape (channels * fft_bins, steps, 1).
         Model Outputs:
-            - final_output: Final classification output with sigmoid
+            - final_output: Final classification output with softmax
                             activation for multi-class classification.
             - early_exit1: Early exit classification output from the
                            first branch.
@@ -68,7 +68,7 @@ class MultiViewConvModel:
 
         seq1 = Dropout(config["dropout"], name="time_dropout_layer1")(seq1)
 
-        early_exit1 = Dense(2, activation="sigmoid", name="early_exit1")(Flatten()(seq1))
+        early_exit1 = Dense(2, activation="softmax", name="early_exit1")(Flatten()(seq1))
 
         seq1 = Conv2D(
             filters=config["nb_filter"],
@@ -80,7 +80,7 @@ class MultiViewConvModel:
 
         seq1 = Dropout(config["dropout"], name="time_dropout_layer2")(seq1)
 
-        early_exit2 = Dense(2, activation="sigmoid", name="early_exit2")(Flatten()(seq1))
+        early_exit2 = Dense(2, activation="softmax", name="early_exit2")(Flatten()(seq1))
 
         seq1 = Flatten(name="time_flatten_layer")(seq1)
 
@@ -100,7 +100,7 @@ class MultiViewConvModel:
 
         seq2 = Dropout(config["dropout"], name="freq_dropout_layer1")(seq2)
 
-        early_exit3 = Dense(2, activation="sigmoid", name="early_exit3")(Flatten()(seq2))
+        early_exit3 = Dense(2, activation="softmax", name="early_exit3")(Flatten()(seq2))
 
         seq2 = Conv2D(
             filters=config["nb_filter"],
@@ -112,7 +112,7 @@ class MultiViewConvModel:
 
         seq2 = Dropout(config["dropout"], name="freq_dropout_layer2")(seq2)
 
-        early_exit4 = Dense(2, activation="sigmoid", name="early_exit4")(Flatten()(seq2))
+        early_exit4 = Dense(2, activation="softmax", name="early_exit4")(Flatten()(seq2))
 
         seq2 = Flatten(name="freq_flatten_layer")(seq2)
 
@@ -124,17 +124,17 @@ class MultiViewConvModel:
         merged = Dense(256, activation="tanh", name="fcn_layer2")(merged)
         merged = Dense(128, activation="tanh", name="fcn_layer3")(merged)
 
-        # Add final classification layer with sigmoid activation for multi-class classification
-        output = Dense(2, activation="sigmoid", name="final_output")(merged)
+        # Add final classification layer with softmax activation for multi-class classification
+        output = Dense(2, activation="softmax", name="final_output")(merged)
 
-        loss_function = config.get("loss", "binary_crossentropy")  # Default to binary_crossentropy
+        loss_function = config.get("loss", "categorical_crossentropy")  # Default to categorical_crossentropy
 
         if loss_function == "focal":
             loss_fn = focal_loss(gamma=2.0, alpha=0.25)
         elif loss_function == "f1":
             loss_fn = f1_loss
         else:
-            loss_fn = "binary_crossentropy"
+            loss_fn = "categorical_crossentropy"
 
         # Model definition
         if use_early_exits:
